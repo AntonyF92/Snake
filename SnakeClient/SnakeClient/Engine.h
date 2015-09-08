@@ -5,6 +5,7 @@
 #include "boost\thread.hpp"
 #include "boost\chrono.hpp"
 #include "boost\timer.hpp"
+#include "Field.h"
 
 
 class Engine
@@ -16,9 +17,18 @@ private:
 	boost::thread serviceThread;
 	double currentTime;
 	int timeForMove;
+	EGameState gameState;
+	Field field;
+	bool canChangeDirection;
+	boost::mutex lpMutex;
+	std::vector<COORD> bonusList;
+	
 	void FixedUpdate();
 	//Player& GetPlayer(int);
 	void MovePlayer(LocalPlayer&);
+	bool CheckPosForBonus(COORD&);
 public:
 	void Init();
+	EGameState GameState() const;
+	void SetLocalDirection(EDirection);
 };

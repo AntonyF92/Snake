@@ -4,6 +4,12 @@
 
 void Field::Init()
 {
+	//HWND hwnd;
+	//LPWSTR title = NULL;
+	//GetConsoleTitle(title, 1024);
+	//hwnd = FindWindow(NULL, title);
+	//MoveWindow(hwnd, 0, 0, GAME_FIELD_WIDTH+1, GAME_FIELD_HEIGHT+2, TRUE);//xnew,ynew,wnew,hnew -новые положение x,y, ширина и высота
+
 	HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
 	CONSOLE_CURSOR_INFO info;
 	info.dwSize = 100;
@@ -59,17 +65,65 @@ void Field::DrawBonus(COORD pos)
 	std::cout << BONUS_SYMBOL;
 }
 
-void Field::DrawPlayer(Player* pl)
+void Field::DrawPlayer(Player& pl)
 {
-	for (auto it = pl->Body().begin(); it != pl->Body().end(); it++)
+	if (pl.IsLocal())
+		SetConsoleCharColor(WHITE);
+	else
 	{
-		SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), it->pos);
-		if (pl->IsLocal())
-			SetConsoleCharColor(WHITE);
-		else
-		{
-			SetConsoleCharColor(LIGHTGREY);
-		}
-		std::cout << SNAKE_BODY_SYMBOL; 
+		SetConsoleCharColor(LIGHTGREY);
 	}
+	for (auto it = pl.Body().begin(); it != pl.Body().end(); it++)
+	{
+		PrintSymbolInPos(SNAKE_BODY_SYMBOL, it->pos);
+	}
+}
+
+void Field::UpdatePlayer(Player& pl)
+{
+	if (pl.IsLocal())
+		SetConsoleCharColor(WHITE);
+	else
+	{
+		SetConsoleCharColor(LIGHTGREY);
+	}
+	PrintSymbolInPos(SNAKE_BODY_SYMBOL, pl.Body()[0].pos);
+	if (pl.drawRemoveTail)
+	{
+		Field::ClearInPosition(pl.Body()[pl.Body().size() - 1].pos);
+		pl.RemoveTail();
+	}
+	else
+	{
+		pl.drawRemoveTail = true;
+	}
+}
+
+void Field::ClearPlayer(std::vector<SnakeBlock>& body)
+{
+	for (auto it = body.begin(); it != body.end(); it++)
+		ClearInPosition(it->pos);
+}
+
+void Field::ClearInPosition(COORD pos)
+{
+	PrintSymbolInPos(' ', pos);
+}
+
+void Field::PrintSymbolInPos(char symbol, COORD pos)
+{
+	SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), pos);
+	std::cout << symbol;
+}
+
+bool Field::CheckHeadPos(COORD& pos)
+{
+	return ((pos.X != 0) && (pos.X != GAME_FIELD_WIDTH) && (pos.Y != 0) && (pos.Y != GAME_FIELD_HEIGHT));
+}
+
+void Field::PrintText(const std::string s)
+{
+	SetConsoleCharColor(WHITE);
+	SetCursorPosition(0, GAME_FIELD_HEIGHT + 1);
+	std::cout << s << std::endl;
 }

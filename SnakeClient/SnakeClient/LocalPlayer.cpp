@@ -1,7 +1,7 @@
 #include <stdafx.h>
 #include "LocalPlayer.h"
 
-LocalPlayer::LocalPlayer():Player::Player(true)
+LocalPlayer::LocalPlayer():Player(true)
 {
 	for (int i = 0; i < INITIAL_SNAKE_LENGTH; i++)
 	{
@@ -11,17 +11,17 @@ LocalPlayer::LocalPlayer():Player::Player(true)
 	}
 }
 
-EDirection LocalPlayer::CurrentDirection() const
-{
-	return currentDirection;
-}
-
-void LocalPlayer::SetDirection(EDirection direction)
-{
-	currentDirection = direction;
-}
 
 COORD LocalPlayer::HeadPosition() const
 {
 	return body[0].pos;
 }
+
+bool LocalPlayer::CheckCollision(COORD& pos)
+{
+	for (auto it = body.begin() + 1; it != body.end(); it++)
+	if ((it->pos.X == pos.X) && (it->pos.Y == pos.Y))
+		return false;
+	return true;
+}
+

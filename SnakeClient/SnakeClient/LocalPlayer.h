@@ -5,10 +5,8 @@
 class LocalPlayer : public Player
 {
 private:
-	EDirection currentDirection;
 public:
 	LocalPlayer();
-	EDirection CurrentDirection() const;
-	void SetDirection(EDirection);
 	COORD HeadPosition() const;
+	bool CheckCollision(COORD&);
 };

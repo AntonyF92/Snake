@@ -24,6 +24,11 @@ struct SnakeBlock
 		pos.X = x;
 		pos.Y = y;
 	};
+	SnakeBlock(int n, COORD pos)
+	{
+		id = n;
+		this->pos = pos;
+	};
 };
 
 typedef boost::shared_ptr<ip::tcp::socket> socket_ptr;
