@@ -5,11 +5,13 @@
 class Client
 {
 private:
+	int id;
 	socket_ptr peer;
 	Dictionary<EPacketType, bytes> packets;
 	void ProcessPackets();
 public:
 	bytes bytesForSend;
-	Client(socket_ptr);
+	Client(int, socket_ptr);
 	void ReadData();
+	int Id();
 };

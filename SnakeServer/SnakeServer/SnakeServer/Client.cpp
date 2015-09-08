@@ -2,8 +2,9 @@
 #include "Client.h"
 
 
-Client::Client(socket_ptr peer)
+Client::Client(int id, socket_ptr peer)
 {
+	this->id = id;
 	this->peer = peer;
 }
 
@@ -13,4 +14,9 @@ void Client::ReadData()
 
 void Client::ProcessPackets()
 {
+}
+
+int Client::Id()
+{
+	return id;
 }
