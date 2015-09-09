@@ -1,6 +1,7 @@
 #include "GeneralDefinitions.h"
 #include "boost\asio.hpp"
 #include "MyContainers.h"
+#include <string>
 
 class Client
 {

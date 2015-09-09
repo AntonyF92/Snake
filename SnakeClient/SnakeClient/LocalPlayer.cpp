@@ -1,26 +1,21 @@
 #include <stdafx.h>
 #include "LocalPlayer.h"
 
-LocalPlayer::LocalPlayer():Player(true)
+LocalPlayer::LocalPlayer(int id, std::vector<COORD> body):Player(id, body)
 {
-	for (int i = 0; i < INITIAL_SNAKE_LENGTH; i++)
-	{
-		SnakeBlock bl(i, 20, i + 10);
-		body.push_back(bl);
-		currentDirection = EDirection::up;
-	}
+	local = true;
 }
 
 
 COORD LocalPlayer::HeadPosition() const
 {
-	return body[0].pos;
+	return body[0];
 }
 
 bool LocalPlayer::CheckCollision(COORD& pos)
 {
 	for (auto it = body.begin() + 1; it != body.end(); it++)
-	if ((it->pos.X == pos.X) && (it->pos.Y == pos.Y))
+	if ((it->X == pos.X) && (it->Y == pos.Y))
 		return false;
 	return true;
 }

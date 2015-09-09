@@ -6,7 +6,7 @@ class LocalPlayer : public Player
 {
 private:
 public:
-	LocalPlayer();
+	LocalPlayer(int, std::vector<COORD>);
 	COORD HeadPosition() const;
 	bool CheckCollision(COORD&);
 };

@@ -11,9 +11,10 @@
 class Engine
 {
 private:
+	io_service service;
 	socket_ptr peer;
 	std::vector<Player> remotePlayers;
-	LocalPlayer localPlayer;
+	LocalPlayer* localPlayer;
 	boost::thread serviceThread;
 	double currentTime;
 	int timeForMove;
@@ -22,12 +23,18 @@ private:
 	bool canChangeDirection;
 	boost::mutex lpMutex;
 	std::vector<COORD> bonusList;
+	std::string bytesForSend;
 	
 	void FixedUpdate();
-	//Player& GetPlayer(int);
-	void MovePlayer(LocalPlayer&);
+	Player* GetPlayer(int);
+	void MovePlayer();
 	bool CheckPosForBonus(COORD&);
+	std::string EatBonusSerialize(COORD&);
+	void SendData();
+	void ReceiveData();
+	void Connect();
 public:
+	Engine();
 	void Init();
 	EGameState GameState() const;
 	void SetLocalDirection(EDirection);

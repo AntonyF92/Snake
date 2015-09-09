@@ -75,7 +75,7 @@ void Field::DrawPlayer(Player& pl)
 	}
 	for (auto it = pl.Body().begin(); it != pl.Body().end(); it++)
 	{
-		PrintSymbolInPos(SNAKE_BODY_SYMBOL, it->pos);
+		PrintSymbolInPos(SNAKE_BODY_SYMBOL, *it);
 	}
 }
 
@@ -87,10 +87,10 @@ void Field::UpdatePlayer(Player& pl)
 	{
 		SetConsoleCharColor(LIGHTGREY);
 	}
-	PrintSymbolInPos(SNAKE_BODY_SYMBOL, pl.Body()[0].pos);
+	PrintSymbolInPos(SNAKE_BODY_SYMBOL, pl.Body()[0]);
 	if (pl.drawRemoveTail)
 	{
-		Field::ClearInPosition(pl.Body()[pl.Body().size() - 1].pos);
+		Field::ClearInPosition(pl.Body()[pl.Body().size() - 1]);
 		pl.RemoveTail();
 	}
 	else
@@ -99,10 +99,10 @@ void Field::UpdatePlayer(Player& pl)
 	}
 }
 
-void Field::ClearPlayer(std::vector<SnakeBlock>& body)
+void Field::ClearPlayer(std::vector<COORD>& body)
 {
 	for (auto it = body.begin(); it != body.end(); it++)
-		ClearInPosition(it->pos);
+		ClearInPosition(*it);
 }
 
 void Field::ClearInPosition(COORD pos)

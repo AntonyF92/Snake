@@ -17,5 +17,5 @@ public:
 	void PrintText(const std::string);
 	void UpdatePlayer(Player&);
 	void ClearInPosition(COORD);
-	void ClearPlayer(std::vector<SnakeBlock>& body);
+	void ClearPlayer(std::vector<COORD>& body);
 };
