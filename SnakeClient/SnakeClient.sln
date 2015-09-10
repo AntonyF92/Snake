@@ -5,6 +5,10 @@ VisualStudioVersion = 12.0.21005.1
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SnakeClient", "SnakeClient\SnakeClient.vcxproj", "{8F16868E-9508-440E-B655-EEE0CC9CCBFA}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MemoryBuffer", "..\MemoryBuffer\MemoryBuffer\MemoryBuffer.vcxproj", "{38552B1C-BEA3-4070-A19D-F45BB32BE684}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SnakeServer", "..\SnakeServer\SnakeServer\SnakeServer\SnakeServer.vcxproj", "{0C20CA5B-AC01-40C9-B339-67CE16FCF2C5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -15,6 +19,14 @@ Global
 		{8F16868E-9508-440E-B655-EEE0CC9CCBFA}.Debug|Win32.Build.0 = Debug|Win32
 		{8F16868E-9508-440E-B655-EEE0CC9CCBFA}.Release|Win32.ActiveCfg = Release|Win32
 		{8F16868E-9508-440E-B655-EEE0CC9CCBFA}.Release|Win32.Build.0 = Release|Win32
+		{38552B1C-BEA3-4070-A19D-F45BB32BE684}.Debug|Win32.ActiveCfg = Debug|Win32
+		{38552B1C-BEA3-4070-A19D-F45BB32BE684}.Debug|Win32.Build.0 = Debug|Win32
+		{38552B1C-BEA3-4070-A19D-F45BB32BE684}.Release|Win32.ActiveCfg = Release|Win32
+		{38552B1C-BEA3-4070-A19D-F45BB32BE684}.Release|Win32.Build.0 = Release|Win32
+		{0C20CA5B-AC01-40C9-B339-67CE16FCF2C5}.Debug|Win32.ActiveCfg = Debug|Win32
+		{0C20CA5B-AC01-40C9-B339-67CE16FCF2C5}.Debug|Win32.Build.0 = Debug|Win32
+		{0C20CA5B-AC01-40C9-B339-67CE16FCF2C5}.Release|Win32.ActiveCfg = Release|Win32
+		{0C20CA5B-AC01-40C9-B339-67CE16FCF2C5}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

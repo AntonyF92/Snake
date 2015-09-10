@@ -20,8 +20,8 @@
 #define BLINK 128
 
 
-const char BONUS_SYMBOL = 233;
-const char SNAKE_BODY_SYMBOL = 4;
+const unsigned char BONUS_SYMBOL = 233;
+const unsigned char SNAKE_BODY_SYMBOL = 4;
 const int SNAKE_MOVEMENT_DELTA_TIME = 350;
 const int INITIAL_SNAKE_LENGTH = 5;
 

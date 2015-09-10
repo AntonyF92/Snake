@@ -6,6 +6,7 @@
 #include "boost\chrono.hpp"
 #include "boost\timer.hpp"
 #include "Field.h"
+#include "MemoryBuffer.h"
 
 
 class Engine
@@ -23,13 +24,13 @@ private:
 	bool canChangeDirection;
 	boost::mutex lpMutex;
 	std::vector<COORD> bonusList;
-	std::string bytesForSend;
+	NetPacket* packetForSend;
 	
 	void FixedUpdate();
 	Player* GetPlayer(int);
 	void MovePlayer();
 	bool CheckPosForBonus(COORD&);
-	std::string EatBonusSerialize(COORD&);
+	NetPacket* EatBonusSerialize(COORD&);
 	void SendData();
 	void ReceiveData();
 	void Connect();
@@ -38,4 +39,5 @@ public:
 	void Init();
 	EGameState GameState() const;
 	void SetLocalDirection(EDirection);
+	void PrintString(const char* str);
 };

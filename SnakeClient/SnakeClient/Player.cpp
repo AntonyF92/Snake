@@ -67,18 +67,24 @@ bool Player::SetDirection(EDirection direction)
 	return true;
 }
 
-std::string Player::Serialize()
+NetPacket* Player::Serialize()
 {
-	std::string res;
-	res += ToString((int)EPacketType::client_info) + ",";
-	res += ToString(id) + ",";
-	res += ToString((int)currentDirection) + ",";
+	size_t size = 20 + 4 * body.size();
+	NetPacket* packet = (NetPacket*)MemoryBuffer::Instance()->GetBuffer(size);
+	packet->packet_id = EPacketType::client_info;
+	packet->dataSize = body.size() + 2;
+	packet->data[0] = id;
+	packet->data[1] = currentDirection;
+	packet->packetSize = size;
+	int i = 2;
 	for (auto it = body.begin(); it != body.end(); it++)
 	{
-		res += ToString(it->X) + "," + ToString(it->Y) + ",";
+		packet->data[i] = it->X;
+		i++;
+		packet->data[i] = it->Y;
+		i++;
 	}
-	res += END_OF_PACKET;
-	return res;
+	return packet;
 }
 
 int Player::Id()

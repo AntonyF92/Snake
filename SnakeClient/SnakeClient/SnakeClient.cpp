@@ -9,15 +9,15 @@
 
 int _tmain(int argc, _TCHAR* argv[])
 {
+	Engine engine;
 	try
 	{
-		Engine engine;
 		engine.Init();
 		char key;
 		while ((key = _getch()))
 		{
 			if (key == 27)
-				break;
+				return 0;
 			switch (key)
 			{
 			case 72: engine.SetLocalDirection(EDirection::up); break;
@@ -29,12 +29,13 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 	catch (std::exception& e)
 	{
-		std::cout << e.what() << std::endl;
+		engine.PrintString(e.what());
 	}
 	catch (boost::exception& e)
 	{
-		std::cout << boost::diagnostic_information_what(e) << std::endl;
+		engine.PrintString(boost::diagnostic_information_what(e));
 	}
+	system("pause");
 	return 0;
 }
 

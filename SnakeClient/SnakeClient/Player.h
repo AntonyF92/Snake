@@ -1,5 +1,6 @@
 #pragma once
 #include "GeneralDefinitions.h";
+#include "MemoryBuffer.h"
 
 class Player
 {
@@ -18,7 +19,7 @@ public:
 	bool SetDirection(EDirection);
 	std::vector<COORD> OldBody();
 	void AddBlock(COORD);
-	std::string Serialize();
+	NetPacket* Serialize();
 	int Id();
 	bool IsLocal() const;
 };

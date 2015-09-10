@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include "MemoryBuffer.h"
 
 using namespace boost::asio;
 
@@ -33,6 +34,21 @@ enum EDirection
 	right,
 	down,
 	left
+};
+
+struct NetPacket
+{
+	int packet_id;
+	int dataSize;
+	int packetSize;
+	int data[1];
+};
+
+
+struct TotalPacket
+{
+	int packetCount;
+	NetPacket packets[1];
 };
 
 template<typename T>

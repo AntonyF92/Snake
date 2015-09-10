@@ -8,11 +8,11 @@ class Client
 private:
 	int id;
 	socket_ptr peer;
-	Dictionary<EPacketType, bytes> packets;
-	void ProcessPackets();
+	std::vector<COORD> body;
+	EDirection currentDirection;
 public:
-	bytes bytesForSend;
 	Client(int, socket_ptr);
 	void ReadData();
+	std::vector<COORD>& Body();
 	int Id();
 };

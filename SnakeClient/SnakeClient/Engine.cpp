@@ -1,12 +1,13 @@
 #include <stdafx.h>
 #include "Engine.h"
 
-
 Engine::Engine()
 {
 	currentTime = 0;
 	timeForMove = 0;
 	peer = socket_ptr(new ip::tcp::socket(service));
+	MemoryBuffer::Init();
+	packetForSend = nullptr;
 }
 
 void Engine::Init()
@@ -14,6 +15,8 @@ void Engine::Init()
 	gameState = EGameState::in_progress;
 	field.Init();
 	Connect();
+	while (!peer->available())
+		boost::this_thread::sleep_for(boost::chrono::milliseconds(FIXED_UPDATE_DELTA_TIME));
 	ReceiveData();
 	canChangeDirection = true;
 	field.DrawPlayer(*localPlayer);
@@ -55,7 +58,7 @@ void Engine::FixedUpdate()
 			field.PrintText("Game ended! Press Esc for exit...");
 			break;
 		}
-		if (bytesForSend.length() > 0)
+		if (packetForSend)
 			SendData();
 		currentTime += timer.elapsed() * 1000;
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(FIXED_UPDATE_DELTA_TIME));
@@ -82,12 +85,12 @@ void Engine::MovePlayer()
 	if (Engine::CheckPosForBonus(newPos))
 	{
 		localPlayer->AddBlock(newPos);
-		bytesForSend = EatBonusSerialize(newPos);
+		packetForSend = EatBonusSerialize(newPos);
 	}
 	else
 	{
 		localPlayer->Move();
-		bytesForSend = localPlayer->Serialize();
+		packetForSend = localPlayer->Serialize();
 	}
 	if (!field.CheckHeadPos(localPlayer->HeadPosition()) || !localPlayer->CheckCollision(localPlayer->HeadPosition()))
 		gameState = EGameState::lose;
@@ -111,62 +114,62 @@ bool Engine::CheckPosForBonus(COORD& pos)
 	return false;
 }
 
-std::string Engine::EatBonusSerialize(COORD& pos)
+NetPacket* Engine::EatBonusSerialize(COORD& pos)
 {
-	std::string res;
-	res += ToString((int)EPacketType::client_eat_bonus) + ",";
-	res += ToString(localPlayer->Id()) + ",";
-	res += ToString(pos.X) + "," + ToString(pos.Y) + ",";
-	res += END_OF_PACKET;
-	return res;
+	size_t size = 24;
+	NetPacket* packet = (NetPacket*)MemoryBuffer::Instance()->GetBuffer(size);
+	packet->dataSize = 3;
+	packet->packet_id = EPacketType::client_eat_bonus;
+	packet->data[0] = localPlayer->Id();
+	packet->data[1] = pos.X;
+	packet->data[2] = pos.Y;
+	packet->packetSize = size;
+	return packet;
 }
 
 void Engine::SendData()
 {
-	peer->send(buffer(bytesForSend));
-	bytesForSend.clear();
+	peer->send(buffer(packetForSend, packetForSend->packetSize));
+	packetForSend = nullptr;
 }
 
 void Engine::ReceiveData()
 {
-	std::vector<char> v(peer->available());
-	std::string tmp;
-	peer->receive(buffer(v));
-	std::string buf = VectorToString(v);
-	while (buf.length() > 0)
+	unsigned char* v;
+	size_t a = peer->available();
+	v = new unsigned char[a];
+	std::memset(v, 0, a);
+	peer->receive(buffer(v, a));
+	TotalPacket* totalPacket = (TotalPacket*)v;
+	for (int i = 0; i < totalPacket->packetCount; i++)
 	{
-		size_t index = buf.find(END_OF_PACKET);
-		tmp = buf.substr(0, index);
-		int packet = std::atoi(tmp.substr(0, 1).c_str());
-		std::vector<int> data = SplitStringToInt(tmp, ',');
-		tmp.erase(0, 1);
-		switch ((EPacketType)packet)
+		NetPacket* packet = &totalPacket->packets[i];
+		switch ((EPacketType)packet->packet_id)
 		{
 		case EPacketType::add_client:
 		{
 										std::vector<COORD> body;
-										auto it = data.begin() + 1;
-										while (it != data.end())
+										for (int i = 1; i < packet->dataSize;)
 										{
 											COORD p;
-											p.X = *it;
-											it++;
-											p.Y = *it;
-											it++;
+											p.X = packet->data[i];
+											i++;
+											p.Y = packet->data[i];
+											i++;
 											body.push_back(p);
 										}
-										remotePlayers.push_back(Player(data[0], body));
+										remotePlayers.push_back(Player(packet->data[0], body));
 		}
 			break;
 		case EPacketType::bonus_info:
 		{
-										for (auto it = data.begin(); it != data.end();)
+										for (int i = 0; i < packet->dataSize;)
 										{
 											COORD p;
-											p.X = *it;
-											it++;
-											p.Y = *it;
-											it++;
+											p.X = packet->data[i];
+											i++;
+											p.Y = packet->data[i];
+											i++;
 											bonusList.push_back(p);
 										}
 		}
@@ -174,9 +177,9 @@ void Engine::ReceiveData()
 		case EPacketType::client_eat_bonus:
 		{
 											  COORD p;
-											  p.X = data[1];
-											  p.Y = data[2];
-											  Player* pl = GetPlayer(data[0]);
+											  p.X = packet->data[1];
+											  p.Y = packet->data[2];
+											  Player* pl = GetPlayer(packet->data[0]);
 											  if (pl)
 											  {
 												  pl->AddBlock(p);
@@ -186,29 +189,30 @@ void Engine::ReceiveData()
 			break;
 		case EPacketType::client_info:
 		{
-										 Player* pl = GetPlayer(data[0]);
+										 Player* pl = GetPlayer(packet->data[0]);
 										 if (pl)
-											 pl->SetDirection((EDirection)data[1]);
+											 pl->SetDirection((EDirection)packet->data[1]);
 		}
 			break;
 		case EPacketType::start_info:
 		{
 										std::vector<COORD> body;
-										for (auto it = data.begin() + 1; it != data.end();)
+										for (int i = 2; i < packet->dataSize;)
 										{
 											COORD p;
-											p.X = *it;
-											it++;
-											p.Y = *it;
-											it++;
+											p.X = packet->data[i];
+											i++;
+											p.Y = packet->data[i];
+											i++;
 											body.push_back(p);
 										}
-										localPlayer = new LocalPlayer(data[0], body);
+										localPlayer = new LocalPlayer(packet->data[0], body);
+										localPlayer->SetDirection((EDirection)packet->data[1]);
 		}
 			break;
 		}
-		buf.erase(0, index + 1);
 	}
+	delete v;
 }
 
 Player* Engine::GetPlayer(int id)
@@ -219,4 +223,9 @@ Player* Engine::GetPlayer(int id)
 			return &*it;
 	}
 	return nullptr;
+}
+
+void Engine::PrintString(const char* str)
+{
+	field.PrintText(str);
 }

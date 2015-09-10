@@ -16,7 +16,7 @@ void Field::Init()
 	info.bVisible = false;
 	SetConsoleCursorInfo(consoleHandle, &info);
 	SetConsoleCharColor(LIGHTBLUE);
-	char a = 201;
+	unsigned char a = 201;
 	std::cout << a;
 	SetCursorPosition(0, GAME_FIELD_HEIGHT);
 	a = 200;
