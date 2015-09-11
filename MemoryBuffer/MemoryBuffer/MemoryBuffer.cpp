@@ -7,7 +7,8 @@ unsigned char* MemoryBuffer::GetBuffer(size_t size)
 {
 	if (currentSize < size)
 	{
-		delete largeBuffer;
+		if (currentSize>0)
+			delete largeBuffer;
 		largeBuffer = new (unsigned char[size]);
 	}
 	return largeBuffer;

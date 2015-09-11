@@ -69,10 +69,10 @@ bool Player::SetDirection(EDirection direction)
 
 NetPacket* Player::Serialize()
 {
-	size_t size = 20 + 4 * body.size();
+	size_t size = 20 + 4 * body.size() * 2;
 	NetPacket* packet = (NetPacket*)MemoryBuffer::Instance()->GetBuffer(size);
 	packet->packet_id = EPacketType::client_info;
-	packet->dataSize = body.size() + 2;
+	packet->dataSize = body.size()*2 + 2;
 	packet->data[0] = id;
 	packet->data[1] = currentDirection;
 	packet->packetSize = size;

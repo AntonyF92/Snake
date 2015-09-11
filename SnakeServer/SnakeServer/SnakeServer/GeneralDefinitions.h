@@ -15,6 +15,7 @@ const std::string SERVER_IP = "10.44.2.96";
 const int GAME_FIELD_WIDTH = 79;
 const int GAME_FIELD_HEIGHT = 24;
 const char END_OF_PACKET = '|';
+const int SNAKE_INIT_LENGTH = 3;
 
 typedef boost::shared_ptr<ip::tcp::socket> socket_ptr;
 typedef char* bytes;
@@ -25,7 +26,8 @@ enum EPacketType
 	client_info = 2,
 	bonus_info = 3,
 	client_eat_bonus = 4,
-	add_client = 5
+	add_client = 5,
+	delete_player = 6
 };
 
 enum EDirection

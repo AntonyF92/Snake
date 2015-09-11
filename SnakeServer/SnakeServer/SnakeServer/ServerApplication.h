@@ -9,11 +9,17 @@ class ServerApplication
 {
 private:
 	int addPlayerId;
-	ConcurrentVector<Client> players;
+	std::vector<Client> players;
 	io_service service;
 	ip::tcp::endpoint ep;
 	boost::thread serviceThread;
+	boost::mutex plMutex;
+
+	void CreateBody(Client&);
+	void SendToAll(TotalPacket*, size_t);
+	void Work();
+	void CopyPacket(NetPacket& in, NetPacket& out);
+	void CheckDisconnects();
 public:
 	void Init();
-	void Work();
 };

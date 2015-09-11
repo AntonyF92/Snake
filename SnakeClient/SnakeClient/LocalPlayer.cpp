@@ -4,6 +4,7 @@
 LocalPlayer::LocalPlayer(int id, std::vector<COORD> body):Player(id, body)
 {
 	local = true;
+	this->body = body;
 }
 
 

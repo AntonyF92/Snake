@@ -56,6 +56,7 @@ void Engine::FixedUpdate()
 		if (gameState != EGameState::in_progress)
 		{
 			field.PrintText("Game ended! Press Esc for exit...");
+			peer->shutdown(socket_base::shutdown_both);
 			break;
 		}
 		if (packetForSend)
@@ -149,7 +150,7 @@ void Engine::ReceiveData()
 		case EPacketType::add_client:
 		{
 										std::vector<COORD> body;
-										for (int i = 1; i < packet->dataSize;)
+										for (int i = 2; i < packet->dataSize;)
 										{
 											COORD p;
 											p.X = packet->data[i];
@@ -158,7 +159,9 @@ void Engine::ReceiveData()
 											i++;
 											body.push_back(p);
 										}
-										remotePlayers.push_back(Player(packet->data[0], body));
+										Player pl(packet->data[0], body);
+										pl.SetDirection((EDirection)packet->data[1]);
+										remotePlayers.push_back(pl);
 		}
 			break;
 		case EPacketType::bonus_info:
@@ -208,6 +211,23 @@ void Engine::ReceiveData()
 										}
 										localPlayer = new LocalPlayer(packet->data[0], body);
 										localPlayer->SetDirection((EDirection)packet->data[1]);
+		}
+			break;
+		case EPacketType::delete_player:
+		{
+										   Player* pl = GetPlayer(packet->data[0]);
+										   if (pl)
+										   {
+											   field.ClearPlayer(pl->OldBody());
+											   for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
+											   {
+												   if (it->Id() == pl->Id())
+												   {
+													   remotePlayers.erase(it);
+													   break;
+												   }
+											   }
+										   }
 		}
 			break;
 		}
