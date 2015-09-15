@@ -7,11 +7,12 @@ class Player
 protected:
 	int id;
 	std::vector<COORD> body;
+	std::vector<COORD> oldBody;
 	EDirection currentDirection;
 	bool local;
 public:
 	Player(int, std::vector<COORD>);
-	const std::vector<COORD>& Body();
+	std::vector<COORD>& Body();
 	bool drawRemoveTail;
 	void RemoveTail();
 	void Move();
@@ -19,8 +20,9 @@ public:
 	bool SetDirection(EDirection);
 	std::vector<COORD> OldBody();
 	void AddBlock(COORD);
-	NetPacket* Serialize();
+	std::string Serialize();
 	int Id();
 	bool IsLocal() const;
+	void SaveBody();
 };
 

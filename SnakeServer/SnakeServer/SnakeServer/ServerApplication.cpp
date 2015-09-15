@@ -15,38 +15,22 @@ void ServerApplication::Init()
 	{
 		socket_ptr peer(new ip::tcp::socket(service));
 		acceptor.accept(*peer);
+		peer->set_option(ip::tcp::no_delay(true));
 		Client cl(addPlayerId++, peer);
 		CreateBody(cl);
 
 		plMutex.lock();
-		std::vector<NetPacket*> packets;
-		int i = 0;
+		std::string packetForNewPlayer = "";
+		packetForNewPlayer += cl.SerializeFull(true);
 		for (auto it = players.begin(); it != players.end(); it++)
 		{
-			packets.push_back(it->SerializeFull());
-			i++;
+			if (!it->disconnected)
+			{
+				packetForNewPlayer += it->SerializeFull();
+			}
 		}
-		NetPacket* newPlayer = cl.SerializeFull();
-		newPlayer->packet_id = EPacketType::start_info;
-		size_t packetSize = 0;
-		for (auto it = packets.begin(); it != packets.end(); it++)
-			packetSize += (*it)->packetSize;
-		packetSize += (newPlayer->packetSize + 4);
-		TotalPacket* newPlayerPacket = (TotalPacket*)MemoryBuffer::Instance()->GetBuffer(packetSize);
-		newPlayerPacket->packetCount = players.size() + 1;
-		CopyPacket(*newPlayer, newPlayerPacket->packets[0]);
-		int currentPosition = newPlayer->packetSize;
-		for (int j = 0; j < players.size(); j++)
-		{
-			CopyPacket(*packets[j], newPlayerPacket->packets[currentPosition]);
-			currentPosition += (*packets[j]).packetSize;
-		}
-		cl.Peer()->send(buffer(newPlayerPacket, packetSize));
-		TotalPacket* packetForAll = (TotalPacket*)MemoryBuffer::Instance()->GetBuffer(newPlayer->packetSize + 4);
-		newPlayer->packet_id = EPacketType::add_client;
-		packetForAll->packetCount = 1;
-		packetForAll->packets[0] = *newPlayer;
-		SendToAll(packetForAll, newPlayer->packetSize + 4);
+		cl.Peer()->send(buffer(packetForNewPlayer));
+		SendToAll(cl.SerializeFull());
 		players.push_back(cl);
 		std::cout << "Add player: " << cl.Id() << std::endl;
 		plMutex.unlock();
@@ -58,23 +42,38 @@ void ServerApplication::Work()
 	while (true)
 	{
 		plMutex.lock();
-		CheckDisconnects();
+		std::string packet = "";
+		packet += CheckDisconnects();
 		for (auto it = players.begin(); it != players.end(); it++)
-			it->ReadData();
+		{
+			std::string s = it->ReadData();
+			if (s.length() > 0)
+				packet += s;
+		}
+		if (packet.length() > 0)
+			SendToAll(packet);
 		plMutex.unlock();
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(FIXED_UPDATE_DELTA_TIME));
 	}
 
 }
 
-void ServerApplication::SendToAll(TotalPacket* packet, size_t bytesCount)
+void ServerApplication::SendToAll(std::string packet)
 {
-	auto buff = buffer(packet, bytesCount);
+	auto buff = buffer(packet);
 	for (auto it = players.begin(); it != players.end(); it++)
 	{
-		if (it->Peer()->is_open())
-			it->Peer()->send(buff);
+		try
+		{
+			if (!it->disconnected)
+				it->Peer()->send(buff);
+		}
+		catch(boost::system::system_error& err)
+		{
+			it->disconnected = true;
+		}
 	}
+	packet = "";
 }
 
 void ServerApplication::CreateBody(Client& cl)
@@ -98,24 +97,19 @@ void ServerApplication::CopyPacket(NetPacket& in, NetPacket& out)
 		out.data[i] = in.data[i];
 }
 
-void ServerApplication::CheckDisconnects()
+std::string ServerApplication::CheckDisconnects()
 {
-	for (auto it = players.begin(); it != players.end(); )
+	std::string packet = "";
+	for (auto it = players.begin(); it != players.end();)
 	{
-		if (!it->Peer()->is_open())
+		if (it->disconnected)
 		{
-			TotalPacket* packet = (TotalPacket*)MemoryBuffer::Instance()->GetBuffer(20);
-			packet->packetCount = 1;
-			packet->packets[0].dataSize = 1;
-			packet->packets[0].packetSize = 16;
-			packet->packets[0].packet_id = EPacketType::delete_player;
-			packet->packets[0].data[0] = it->Id();
-			SendToAll(packet, 20);
-			players.erase(it);
+			packet += it->SerializeDelete();
+			std::cout << "Remove player " << it->Id() << std::endl;
+			it = players.erase(it);
 		}
 		else
-		{
 			it++;
-		}
 	}
+	return packet;
 }

@@ -6,45 +6,72 @@ Client::Client(int id, socket_ptr peer)
 {
 	this->id = id;
 	this->peer = peer;
-	justAdded = true;
-	memBuffer = new unsigned char[65536];
+	disconnected = false;
 	currentDirection = EDirection::up;
 }
 
-void Client::ReadData()
+std::string Client::ReadData()
 {
+	
 	if (!peer->available())
-		return;
-	unsigned char* v;
-	size_t a = peer->available();
-	v = new unsigned char[a];
-	std::memset(v, 0, a);
-	peer->receive(buffer(v, a));
-	NetPacket* packet = (NetPacket*)v;
-	switch ((EPacketType)packet->packet_id)
+		return "";
+	std::string res = "";
+	char* v;
+	try
 	{
-	case EPacketType::client_eat_bonus:
-	{
-
+		size_t a = peer->available();
+		v = new char[a];
+		std::memset(v, 0, a);
+		peer->receive(buffer(v, a));
+		std::string data(v);
+		FormattPacket(data);
+		while (data.length() > 0)
+		{
+			std::vector<int> packet = SplitStringToInt(data.substr(0, data.find(END_OF_PACKET)), ',');
+			if (packet.size())
+			{
+				switch ((EPacketType)packet[0])
+				{
+				case EPacketType::client_eat_bonus:
+				{
+													  COORD p;
+													  p.X = packet[2];
+													  p.Y = packet[3];
+													  body.insert(body.begin(), p);
+													  res += data.substr(0, data.find(END_OF_PACKET) + 1);
+				}
+					break;
+				case EPacketType::client_info:
+				{
+												 body.clear();
+												 for (int i = 2; i < packet.size();)
+												 {
+													 COORD p;
+													 p.X = packet[i];
+													 i++;
+													 p.Y = packet[i];
+													 i++;
+													 body.push_back(p);
+												 }
+												 res += Serialize();
+				}
+					break;
+				case EPacketType::delete_player:
+				{
+												   disconnected = true;
+				}
+					break;
+				}
+			}
+			data = data.erase(0, data.find('|') + 1);
+		}
 	}
-		break;
-	case EPacketType::client_info:
+	catch (boost::system::system_error& err)
 	{
-									 currentDirection = (EDirection)packet->data[1];
-									 body.clear();
-									 for (int i = 2; i < packet->dataSize;)
-									 {
-										 COORD p;
-										 p.X = packet->data[i];
-										 i++;
-										 p.Y = packet->data[i];
-										 i++;
-										 body.push_back(p);
-									 }
-	}
-		break;
+		disconnected = true;
 	}
 	delete v;
+	return res;
 }
 
 
@@ -63,35 +90,53 @@ EDirection Client::CurrentDirection()
 	return currentDirection;
 }
 
-NetPacket Client::Serialize()
+std::string Client::Serialize()
 {
-	NetPacket packet;
-	packet.dataSize = 2;
-	packet.packet_id = EPacketType::client_info;
-	packet.packetSize = 20;
-	packet.data[0] = id;
-	packet.data[1] = currentDirection;
+	std::string packet = "";
+	packet += ToString((int)EPacketType::client_info) + ",";
+	packet += ToString(id) + ",";
+	/*COORD last = *body.begin();
+	packet += ToString(last.X) + ",";
+	packet += ToString(last.Y) + ",";
+	for (auto it = body.begin(); it != body.end(); it++)
+	{
+		if ((last.X != it->X) && (last.Y != it->Y))
+		{
+			packet += ToString(it->X) + ",";
+			packet += ToString(it->Y) + ",";
+		}
+		last = *it;
+	}
+	packet += ToString(body.rbegin()->X) + ",";
+	packet += ToString(body.rbegin()->Y) + ",";*/
+
+	for (size_t j = 0; j<body.size(); j++)
+	{
+		auto coord = body[j];
+		packet += ToString(coord.X) + ",";
+		packet += ToString(coord.Y) + ",";
+	}
+
+	packet += END_OF_PACKET;
 	return packet;
 }
 
-NetPacket* Client::SerializeFull()
+std::string Client::SerializeFull(bool for_start)
 {
-	size_t size = 20 + 4 * body.size() * 2;
-	NetPacket* packet = (NetPacket*)memBuffer;
-	packet->packet_id = EPacketType::add_client;
-	packet->dataSize = body.size()*2 + 2;
-	packet->data[0] = id;
-	packet->data[1] = currentDirection;
-	packet->packetSize = size;
-	int i = 2;
+	std::string packet = "";
+	if (for_start)
+		packet += ToString((int)EPacketType::start_info) + ",";
+	else
+		packet += ToString((int)EPacketType::add_client) + ",";
+	packet += ToString(id) + ",";
+	packet += ToString((int)currentDirection) + ",";
 	for (size_t j=0;j<body.size();j++)
 	{
 		auto coord = body[j];
-		packet->data[i] = coord.X;
-		i++;  
-		packet->data[i] = coord.Y;
-		i++;
+		packet += ToString(coord.X) + ",";
+		packet += ToString(coord.Y) + ",";
 	}
+	packet += END_OF_PACKET;
 	return packet;
 }
 
@@ -103,4 +148,13 @@ socket_ptr Client::Peer()
 std::vector<COORD>& Client::Body()
 {
 	return body;
+}
+
+std::string Client::SerializeDelete()
+{
+	std::string packet = "";
+	packet += ToString((int)EPacketType::delete_player) + ",";
+	packet += ToString(id) + ",";
+	packet += END_OF_PACKET;
+	return packet;
 }

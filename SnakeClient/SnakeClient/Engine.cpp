@@ -7,7 +7,7 @@ Engine::Engine()
 	timeForMove = 0;
 	peer = socket_ptr(new ip::tcp::socket(service));
 	MemoryBuffer::Init();
-	packetForSend = nullptr;
+	packetForSend = "";
 }
 
 void Engine::Init()
@@ -34,32 +34,37 @@ void Engine::FixedUpdate()
 	while (true)
 	{
 		boost::timer timer;
+		bool save = false;
 		if (peer->available())
+		{
+			//for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
+			//	it->SaveBody();
+			//save = true;
 			ReceiveData();
+		}
 		if (currentTime >= timeForMove)
 		{
 			boost::lock_guard<boost::mutex> lock(lpMutex);
-			auto old = localPlayer->OldBody();
-			MovePlayer();
-			field.ClearPlayer(old);
-			field.DrawPlayer(*localPlayer);
-			for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
+			/*for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
 			{
-				old = it->OldBody();
-				it->Move();
-				field.ClearPlayer(old);
+				field.ClearPlayer(it->OldBody());
 				field.DrawPlayer(*it);
-			}
+			}*/
+			localPlayer->SaveBody();
+			MovePlayer();
+			field.ClearPlayer(localPlayer->OldBody());
+			field.DrawPlayer(*localPlayer);
+			
 			canChangeDirection = true;
 			timeForMove += SNAKE_MOVEMENT_DELTA_TIME;
 		}
 		if (gameState != EGameState::in_progress)
 		{
 			field.PrintText("Game ended! Press Esc for exit...");
-			peer->shutdown(socket_base::shutdown_both);
+			Close();
 			break;
 		}
-		if (packetForSend)
+		if (packetForSend.length()>0)
 			SendData();
 		currentTime += timer.elapsed() * 1000;
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(FIXED_UPDATE_DELTA_TIME));
@@ -83,7 +88,9 @@ void Engine::MovePlayer()
 	case EDirection::left: newPos.X--; break;
 	case EDirection::right: newPos.X++; break;
 	}
-	if (Engine::CheckPosForBonus(newPos))
+	if (!field.CheckHeadPos(newPos) || !localPlayer->CheckCollision(newPos))
+		gameState = EGameState::lose;
+	else if (Engine::CheckPosForBonus(newPos))
 	{
 		localPlayer->AddBlock(newPos);
 		packetForSend = EatBonusSerialize(newPos);
@@ -93,8 +100,7 @@ void Engine::MovePlayer()
 		localPlayer->Move();
 		packetForSend = localPlayer->Serialize();
 	}
-	if (!field.CheckHeadPos(localPlayer->HeadPosition()) || !localPlayer->CheckCollision(localPlayer->HeadPosition()))
-		gameState = EGameState::lose;
+	
 	
 }
 
@@ -115,122 +121,164 @@ bool Engine::CheckPosForBonus(COORD& pos)
 	return false;
 }
 
-NetPacket* Engine::EatBonusSerialize(COORD& pos)
+std::string Engine::EatBonusSerialize(COORD& pos)
 {
-	size_t size = 24;
-	NetPacket* packet = (NetPacket*)MemoryBuffer::Instance()->GetBuffer(size);
-	packet->dataSize = 3;
-	packet->packet_id = EPacketType::client_eat_bonus;
-	packet->data[0] = localPlayer->Id();
-	packet->data[1] = pos.X;
-	packet->data[2] = pos.Y;
-	packet->packetSize = size;
+	std::string packet = "";
+	packet += ToString((int)EPacketType::client_eat_bonus) + ",";
+	packet += ToString(localPlayer->Id()) + ",";
+	packet += ToString(pos.X) + ",";
+	packet += ToString(pos.Y) + ",";
+	packet += END_OF_PACKET;
 	return packet;
 }
 
 void Engine::SendData()
 {
-	peer->send(buffer(packetForSend, packetForSend->packetSize));
-	packetForSend = nullptr;
+	peer->send(buffer(packetForSend));
+	packetForSend = "";
 }
 
 void Engine::ReceiveData()
 {
-	unsigned char* v;
+	char* v;
 	size_t a = peer->available();
-	v = new unsigned char[a];
+	v = new char[a];
 	std::memset(v, 0, a);
 	peer->receive(buffer(v, a));
-	TotalPacket* totalPacket = (TotalPacket*)v;
-	for (int i = 0; i < totalPacket->packetCount; i++)
+	std::string data(v);
+	FormattPacket(data);
+	while (data.length()>0)
 	{
-		NetPacket* packet = &totalPacket->packets[i];
-		switch ((EPacketType)packet->packet_id)
+		std::vector<int> packet = SplitStringToInt(data.substr(0, data.find('|')), ',');
+		if (packet.size())
 		{
-		case EPacketType::add_client:
-		{
-										std::vector<COORD> body;
-										for (int i = 2; i < packet->dataSize;)
-										{
-											COORD p;
-											p.X = packet->data[i];
-											i++;
-											p.Y = packet->data[i];
-											i++;
-											body.push_back(p);
-										}
-										Player pl(packet->data[0], body);
-										pl.SetDirection((EDirection)packet->data[1]);
-										remotePlayers.push_back(pl);
-		}
-			break;
-		case EPacketType::bonus_info:
-		{
-										for (int i = 0; i < packet->dataSize;)
-										{
-											COORD p;
-											p.X = packet->data[i];
-											i++;
-											p.Y = packet->data[i];
-											i++;
-											bonusList.push_back(p);
-										}
-		}
-			break;
-		case EPacketType::client_eat_bonus:
-		{
-											  COORD p;
-											  p.X = packet->data[1];
-											  p.Y = packet->data[2];
-											  Player* pl = GetPlayer(packet->data[0]);
-											  if (pl)
-											  {
-												  pl->AddBlock(p);
-												  pl->drawRemoveTail = false;
-											  }
-		}
-			break;
-		case EPacketType::client_info:
-		{
-										 Player* pl = GetPlayer(packet->data[0]);
-										 if (pl)
-											 pl->SetDirection((EDirection)packet->data[1]);
-		}
-			break;
-		case EPacketType::start_info:
-		{
-										std::vector<COORD> body;
-										for (int i = 2; i < packet->dataSize;)
-										{
-											COORD p;
-											p.X = packet->data[i];
-											i++;
-											p.Y = packet->data[i];
-											i++;
-											body.push_back(p);
-										}
-										localPlayer = new LocalPlayer(packet->data[0], body);
-										localPlayer->SetDirection((EDirection)packet->data[1]);
-		}
-			break;
-		case EPacketType::delete_player:
-		{
-										   Player* pl = GetPlayer(packet->data[0]);
-										   if (pl)
-										   {
-											   field.ClearPlayer(pl->OldBody());
-											   for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
+			switch ((EPacketType)packet[0])
+			{
+			case EPacketType::add_client:
+			{
+											std::vector<COORD> body;
+											for (size_t i = 3; i < packet.size();)
+											{
+												COORD p;
+												p.X = packet[i];
+												i++;
+												p.Y = packet[i];
+												i++;
+												body.push_back(p);
+											}
+											Player pl(packet[1], body);
+											remotePlayers.push_back(pl);
+											field.DrawPlayer(pl);
+			}
+				break;
+			case EPacketType::bonus_info:
+			{
+											for (size_t i = 1; i < packet.size();)
+											{
+												COORD p;
+												p.X = packet[i];
+												i++;
+												p.Y = packet[i];
+												i++;
+												bonusList.push_back(p);
+											}
+			}
+				break;
+			case EPacketType::client_eat_bonus:
+			{
+												  COORD p;
+												  p.X = packet[2];
+												  p.Y = packet[3];
+												  Player* pl = GetPlayer(packet[1]);
+												  if (pl)
+												  {
+													  pl->AddBlock(p);
+													  pl->drawRemoveTail = false;
+												  }
+			}
+				break;
+			case EPacketType::client_info:
+			{
+											 Player* pl = GetPlayer(packet[1]);
+											 if (pl)
+											 {
+												 field.ClearPlayer(pl->Body());
+												 pl->Body().clear();
+												 std::vector<COORD> body;
+												 for (size_t i = 2; i < packet.size();)
+												 {
+													 /*COORD begin;
+													 begin.X = packet[i];
+													 i++;
+													 begin.Y = packet[i];
+													 i++;
+													 COORD end;
+													 end.X = packet[i];
+													 i++;
+													 end.Y = packet[i];
+													 if (i < packet.size() - 1)
+														 i--;
+													 else
+													 {
+														 i++;
+													 }
+													 body = CalcBody(begin, end);
+													 if (pl->Body().size()>0)
+													 {
+														 if ((pl->Body().rbegin()->X == body.begin()->X) && (pl->Body().rbegin()->Y == body.begin()->Y))
+															 body.erase(body.begin());
+													 }
+													 for (size_t j = 0; j < body.size(); j++)
+													 {
+														 pl->Body().push_back(body[j]);
+													 }*/
+													 COORD p;
+													 p.X = packet[i];
+													 i++;
+													 p.Y = packet[i];
+													 i++;
+													 pl->Body().push_back(p);
+												 }
+												 field.DrawPlayer(*pl);
+											 }
+			}
+				break;
+			case EPacketType::start_info:
+			{
+											std::vector<COORD> body;
+											for (size_t i = 3; i < packet.size();)
+											{
+												COORD p;
+												p.X = packet[i];
+												i++;
+												p.Y = packet[i];
+												i++;
+												body.push_back(p);
+											}
+											localPlayer = new LocalPlayer(packet[1], body);
+											localPlayer->SetDirection((EDirection)packet[2]);
+			}
+				break;
+			case EPacketType::delete_player:
+			{
+											   Player* pl = GetPlayer(packet[1]);
+											   if (pl)
 											   {
-												   if (it->Id() == pl->Id())
+												   field.ClearPlayer(pl->Body());
+												   for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
 												   {
-													   remotePlayers.erase(it);
-													   break;
+													   if (it->Id() == pl->Id())
+													   {
+														   remotePlayers.erase(it);
+														   break;
+													   }
 												   }
 											   }
-										   }
+			}
+				break;
+			}
 		}
-			break;
-		}
+		data = data.erase(0, data.find('|') + 1);
 	}
 	delete v;
 }
@@ -248,4 +296,48 @@ Player* Engine::GetPlayer(int id)
 void Engine::PrintString(const char* str)
 {
 	field.PrintText(str);
+}
+
+void Engine::Close()
+{
+	packetForSend += ToString((int)EPacketType::delete_player) + ",";
+	packetForSend += ToString(localPlayer->Id()) + ",";
+	packetForSend += END_OF_PACKET;
+	SendData();
+	peer->close();
+}
+
+std::vector<COORD> Engine::CalcBody(COORD begin, COORD end)
+{
+	std::vector<COORD> res;
+	res.push_back(begin);
+	
+	COORD last = begin;
+	while ((last.X != end.X) || (last.Y != end.Y))
+	{
+		COORD newPos;
+		if (last.X == end.X)
+		{
+			newPos.X = last.X;
+			if (last.Y < end.Y)
+				newPos.Y = last.Y + 1;
+			else
+			{
+				newPos.Y = last.Y - 1;
+			}
+		}
+		else if (last.Y == end.Y)
+		{
+			newPos.Y = last.Y;
+			if (last.X < end.X)
+				newPos.X = last.X + 1;
+			else
+			{
+				newPos.X = last.X - 1;
+			}
+		}
+		res.push_back(newPos);
+		last = newPos;
+	}
+	return res;
 }

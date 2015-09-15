@@ -10,16 +10,16 @@ private:
 	std::vector<COORD> body;
 	EDirection currentDirection;
 	bool directionChanged;
-	unsigned char* memBuffer;
 public:
-	bool justAdded;
+	bool disconnected;
 	Client(int, socket_ptr);
-	void ReadData();
+	std::string ReadData();
 	std::vector<COORD>& Body();
 	int Id();
 	bool DirectionChanged();
 	EDirection CurrentDirection();
-	NetPacket Serialize();
-	NetPacket* SerializeFull();
+	std::string Serialize();
+	std::string SerializeFull(bool for_start = false);
+	std::string SerializeDelete();
 	socket_ptr Peer();
 };

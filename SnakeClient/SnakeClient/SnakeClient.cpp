@@ -17,7 +17,11 @@ int _tmain(int argc, _TCHAR* argv[])
 		while ((key = _getch()))
 		{
 			if (key == 27)
+			{
+				if (engine.GameState() == EGameState::in_progress)
+					engine.Close();
 				return 0;
+			}
 			switch (key)
 			{
 			case 72: engine.SetLocalDirection(EDirection::up); break;

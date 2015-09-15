@@ -7,6 +7,7 @@
 #include "boost\timer.hpp"
 #include "Field.h"
 #include "MemoryBuffer.h"
+#include "boost\regex.hpp"
 
 
 class Engine
@@ -24,20 +25,22 @@ private:
 	bool canChangeDirection;
 	boost::mutex lpMutex;
 	std::vector<COORD> bonusList;
-	NetPacket* packetForSend;
+	std::string packetForSend;
 	
 	void FixedUpdate();
 	Player* GetPlayer(int);
 	void MovePlayer();
 	bool CheckPosForBonus(COORD&);
-	NetPacket* EatBonusSerialize(COORD&);
+	std::string EatBonusSerialize(COORD&);
 	void SendData();
 	void ReceiveData();
 	void Connect();
+	std::vector<COORD> CalcBody(COORD, COORD);
 public:
 	Engine();
 	void Init();
 	EGameState GameState() const;
 	void SetLocalDirection(EDirection);
 	void PrintString(const char* str);
+	void Close();
 };

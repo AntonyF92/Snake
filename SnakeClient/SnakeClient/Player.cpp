@@ -17,7 +17,7 @@ bool Player::IsLocal() const
 }
 
 
-const std::vector<COORD>& Player::Body()
+std::vector<COORD>& Player::Body()
 {
 	return body;
 }
@@ -46,7 +46,7 @@ void Player::Move()
 
 std::vector<COORD> Player::OldBody()
 {
-	return body;
+	return oldBody;
 }
 
 void Player::AddBlock(COORD sb)
@@ -67,27 +67,28 @@ bool Player::SetDirection(EDirection direction)
 	return true;
 }
 
-NetPacket* Player::Serialize()
+std::string Player::Serialize()
 {
-	size_t size = 20 + 4 * body.size() * 2;
-	NetPacket* packet = (NetPacket*)MemoryBuffer::Instance()->GetBuffer(size);
-	packet->packet_id = EPacketType::client_info;
-	packet->dataSize = body.size()*2 + 2;
-	packet->data[0] = id;
-	packet->data[1] = currentDirection;
-	packet->packetSize = size;
-	int i = 2;
+	std::string packet = "";
+	packet += ToString((int)EPacketType::client_info) + ",";
+	packet += ToString(id) + ",";
 	for (auto it = body.begin(); it != body.end(); it++)
 	{
-		packet->data[i] = it->X;
-		i++;
-		packet->data[i] = it->Y;
-		i++;
+		packet += ToString(it->X) + ",";
+		packet += ToString(it->Y) + ",";
 	}
+	packet += END_OF_PACKET;
 	return packet;
 }
 
 int Player::Id()
 {
 	return id;
+}
+
+void Player::SaveBody()
+{
+	oldBody.clear();
+	for (auto it = body.begin(); it != body.end(); it++)
+		oldBody.push_back(*it);
 }

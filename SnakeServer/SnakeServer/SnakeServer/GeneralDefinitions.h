@@ -5,6 +5,7 @@
 #include <vector>
 #include <sstream>
 #include "MemoryBuffer.h"
+#include "boost\regex.hpp"
 
 using namespace boost::asio;
 
@@ -67,8 +68,9 @@ inline std::vector<int> SplitStringToInt(std::string source, char splitSymbol)
 	while (source.length() > 0)
 	{
 		size_t pos = source.find(',');
-		res.push_back(std::atoi(source.substr(0, pos).c_str()));
-		source.erase(0, pos + 1);
+		if (pos != std::string::npos)
+			res.push_back(std::atoi(source.substr(0, pos).c_str()));
+		source.erase(0, pos == std::string::npos ? std::string::npos : pos + 1);
 	}
 	return res;
 }
@@ -80,4 +82,12 @@ std::string VectorToString(std::vector<T> source)
 	for (auto it = source.begin(); it != source.end(); it++)
 		res += *it;
 	return res;
+}
+
+inline void FormattPacket(std::string& s)
+{
+	boost::regex reg("[^(((\\d+\,)+\|)+)]+");
+	s = boost::regex_replace(s, reg, "");
+	auto pos = s.find_last_of(END_OF_PACKET);
+	s = s.erase(pos == std::string::npos ? 0 : pos + 1);
 }

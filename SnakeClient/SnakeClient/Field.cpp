@@ -125,5 +125,7 @@ void Field::PrintText(const std::string s)
 {
 	SetConsoleCharColor(WHITE);
 	SetCursorPosition(0, GAME_FIELD_HEIGHT + 1);
+	std::cout << "                                                               " << std::endl;
+	SetCursorPosition(0, GAME_FIELD_HEIGHT + 1);
 	std::cout << s << std::endl;
 }

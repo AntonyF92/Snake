@@ -16,10 +16,11 @@ private:
 	boost::mutex plMutex;
 
 	void CreateBody(Client&);
-	void SendToAll(TotalPacket*, size_t);
+	void SendToAll(std::string packet);
 	void Work();
 	void CopyPacket(NetPacket& in, NetPacket& out);
-	void CheckDisconnects();
+	std::string CheckDisconnects();
 public:
+	std::string packetForSend;
 	void Init();
 };
