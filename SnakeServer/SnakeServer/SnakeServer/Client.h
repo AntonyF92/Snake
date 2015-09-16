@@ -9,17 +9,22 @@ private:
 	socket_ptr peer;
 	std::vector<COORD> body;
 	EDirection currentDirection;
-	bool directionChanged;
 public:
 	bool disconnected;
+	bool finished;
+	bool directionChanged;
 	Client(int, socket_ptr);
 	std::string ReadData();
 	std::vector<COORD>& Body();
 	int Id();
-	bool DirectionChanged();
 	EDirection CurrentDirection();
 	std::string Serialize();
 	std::string SerializeFull(bool for_start = false);
 	std::string SerializeDelete();
 	socket_ptr Peer();
+	void SetDirection(EDirection);
+	void Move();
+	COORD HeadPosition() const;
+	void AddBlock(COORD);
+	bool CheckCollision(COORD&);
 };

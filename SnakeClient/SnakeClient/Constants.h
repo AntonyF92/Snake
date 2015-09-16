@@ -20,10 +20,8 @@
 #define BLINK 128
 
 
-const unsigned char BONUS_SYMBOL = 233;
+const unsigned char BONUS_SYMBOL = 3;
 const unsigned char SNAKE_BODY_SYMBOL = 4;
-const int SNAKE_MOVEMENT_DELTA_TIME = 350;
-const int INITIAL_SNAKE_LENGTH = 5;
 
 enum EGameState
 {

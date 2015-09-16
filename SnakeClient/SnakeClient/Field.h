@@ -15,7 +15,7 @@ public:
 	void DrawBonus(COORD);
 	bool CheckHeadPos(COORD&);
 	void PrintText(const std::string);
-	void UpdatePlayer(Player&);
+	void UpdatePlayer(const std::vector<COORD>& forClear, const std::vector<COORD>& forDraw, const bool is_local);
 	void ClearInPosition(COORD);
 	void ClearPlayer(std::vector<COORD>& body);
 };

@@ -7,6 +7,7 @@ Client::Client(int id, socket_ptr peer)
 	this->id = id;
 	this->peer = peer;
 	disconnected = false;
+	finished = false;
 	currentDirection = EDirection::up;
 }
 
@@ -32,28 +33,14 @@ std::string Client::ReadData()
 			{
 				switch ((EPacketType)packet[0])
 				{
-				case EPacketType::client_eat_bonus:
-				{
-													  COORD p;
-													  p.X = packet[2];
-													  p.Y = packet[3];
-													  body.insert(body.begin(), p);
-													  res += data.substr(0, data.find(END_OF_PACKET) + 1);
-				}
-					break;
 				case EPacketType::client_info:
 				{
-												 body.clear();
-												 for (int i = 2; i < packet.size();)
-												 {
-													 COORD p;
-													 p.X = packet[i];
-													 i++;
-													 p.Y = packet[i];
-													 i++;
-													 body.push_back(p);
-												 }
-												 res += Serialize();
+												 EDirection direction = (EDirection)packet[1];
+												 if (((currentDirection ^ direction) == 2) || ((currentDirection ^ direction) == 6) || (currentDirection == direction) || directionChanged)
+													 break;
+												 currentDirection = direction;
+												 std::cout << "Player " << id << " change move direction to " << direction << std::endl;
+												 directionChanged = true;
 				}
 					break;
 				case EPacketType::delete_player:
@@ -78,11 +65,6 @@ std::string Client::ReadData()
 int Client::Id()
 {
 	return id;
-}
-
-bool Client::DirectionChanged()
-{
-	return directionChanged;
 }
 
 EDirection Client::CurrentDirection()
@@ -157,4 +139,49 @@ std::string Client::SerializeDelete()
 	packet += ToString(id) + ",";
 	packet += END_OF_PACKET;
 	return packet;
+}
+
+void Client::SetDirection(EDirection direction)
+{
+	if (((currentDirection ^ direction) == 2) || ((currentDirection ^ direction) == 6) || (currentDirection == direction) || directionChanged)
+		return;
+	currentDirection = direction;
+	directionChanged = true;
+}
+
+void Client::Move()
+{
+	for (int i = body.size() - 1; i > 0; i--)
+	{
+		body[i].X = body[i - 1].X;
+		body[i].Y = body[i - 1].Y;
+	}
+	auto it = body.begin();
+	switch (currentDirection)
+	{
+	case EDirection::up: it->Y--; break;
+	case EDirection::down: it->Y++; break;
+	case EDirection::left: it->X--; break;
+	case EDirection::right: it->X++; break;
+	}
+
+
+}
+
+COORD Client::HeadPosition() const
+{
+	return *body.begin();
+}
+
+void Client::AddBlock(COORD sb)
+{
+	body.insert(body.begin(), sb);
+}
+
+bool Client::CheckCollision(COORD& pos)
+{
+	for (auto it = body.begin() + 1; it != body.end(); it++)
+	if ((it->X == pos.X) && (it->Y == pos.Y))
+		return false;
+	return true;
 }

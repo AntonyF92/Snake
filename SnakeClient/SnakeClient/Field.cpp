@@ -79,24 +79,18 @@ void Field::DrawPlayer(Player& pl)
 	}
 }
 
-void Field::UpdatePlayer(Player& pl)
+void Field::UpdatePlayer(const std::vector<COORD>& forClear, const std::vector<COORD>& forDraw, const bool is_local)
 {
-	if (pl.IsLocal())
+	for (auto it = forClear.begin(); it != forClear.end(); it++)
+		ClearInPosition(*it);
+	if (is_local)
 		SetConsoleCharColor(WHITE);
 	else
 	{
 		SetConsoleCharColor(LIGHTGREY);
 	}
-	PrintSymbolInPos(SNAKE_BODY_SYMBOL, pl.Body()[0]);
-	if (pl.drawRemoveTail)
-	{
-		Field::ClearInPosition(pl.Body()[pl.Body().size() - 1]);
-		pl.RemoveTail();
-	}
-	else
-	{
-		pl.drawRemoveTail = true;
-	}
+	for (auto it = forDraw.begin(); it != forDraw.end(); it++)
+		PrintSymbolInPos(SNAKE_BODY_SYMBOL, *it);
 }
 
 void Field::ClearPlayer(std::vector<COORD>& body)

@@ -42,35 +42,34 @@ void Engine::FixedUpdate()
 			//save = true;
 			ReceiveData();
 		}
-		if (currentTime >= timeForMove)
-		{
-			boost::lock_guard<boost::mutex> lock(lpMutex);
-			/*for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
-			{
-				field.ClearPlayer(it->OldBody());
-				field.DrawPlayer(*it);
-			}*/
-			localPlayer->SaveBody();
-			MovePlayer();
-			field.ClearPlayer(localPlayer->OldBody());
-			field.DrawPlayer(*localPlayer);
-			
-			canChangeDirection = true;
-			timeForMove += SNAKE_MOVEMENT_DELTA_TIME;
-		}
-		if (gameState != EGameState::in_progress)
-		{
-			field.PrintText("Game ended! Press Esc for exit...");
-			Close();
-			break;
-		}
-		if (packetForSend.length()>0)
-			SendData();
+		//if (currentTime >= timeForMove)
+		//{
+		//	boost::lock_guard<boost::mutex> lock(lpMutex);
+		//	/*for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
+		//	{
+		//		field.ClearPlayer(it->OldBody());
+		//		field.DrawPlayer(*it);
+		//	}*/
+		//	localPlayer->SaveBody();
+		//	MovePlayer();
+		//	field.ClearPlayer(localPlayer->OldBody());
+		//	field.DrawPlayer(*localPlayer);
+		//	
+		//	canChangeDirection = true;
+		//	timeForMove += SNAKE_MOVEMENT_DELTA_TIME;
+		//}
+		//if (gameState != EGameState::in_progress)
+		//{
+		//	field.PrintText("Game ended! Press Esc for exit...");
+		//	Close();
+		//	break;
+		//}
+		/*if (packetForSend.length()>0)
+			SendData();*/
 		currentTime += timer.elapsed() * 1000;
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(FIXED_UPDATE_DELTA_TIME));
 		currentTime += FIXED_UPDATE_DELTA_TIME;
 	}
-	TerminateThread(serviceThread.native_handle(), 0);
 }
 
 EGameState Engine::GameState() const
@@ -107,10 +106,10 @@ void Engine::MovePlayer()
 void Engine::SetLocalDirection(EDirection direction)
 {
 	boost::lock_guard<boost::mutex> lock(lpMutex);
-	if (canChangeDirection)
-	{
-		canChangeDirection = !localPlayer->SetDirection(direction);
-	}
+	packetForSend += ToString((int)EPacketType::client_info) + ",";
+	packetForSend += ToString((int)direction) + ",";
+	packetForSend += END_OF_PACKET;
+	SendData();
 }
 
 bool Engine::CheckPosForBonus(COORD& pos)
@@ -134,7 +133,11 @@ std::string Engine::EatBonusSerialize(COORD& pos)
 
 void Engine::SendData()
 {
-	peer->send(buffer(packetForSend));
+	try
+	{
+		peer->send(buffer(packetForSend));
+	}
+	catch (boost::system::system_error& err){}
 	packetForSend = "";
 }
 
@@ -173,6 +176,9 @@ void Engine::ReceiveData()
 				break;
 			case EPacketType::bonus_info:
 			{
+											for (auto it = bonusList.begin(); it != bonusList.end(); it++)
+												field.ClearInPosition(*it);
+											bonusList.clear();
 											for (size_t i = 1; i < packet.size();)
 											{
 												COORD p;
@@ -181,6 +187,7 @@ void Engine::ReceiveData()
 												p.Y = packet[i];
 												i++;
 												bonusList.push_back(p);
+												field.DrawBonus(p);
 											}
 			}
 				break;
@@ -199,10 +206,19 @@ void Engine::ReceiveData()
 				break;
 			case EPacketType::client_info:
 			{
-											 Player* pl = GetPlayer(packet[1]);
+											 Player* pl = nullptr;
+											 if (localPlayer->Id() == packet[1])
+											 {
+												 pl = localPlayer;
+											 }
+											 else
+											 {
+												 pl = GetPlayer(packet[1]);
+											 }
 											 if (pl)
 											 {
-												 field.ClearPlayer(pl->Body());
+												 std::vector<COORD> oldBody = pl->Body();
+												 std::vector<COORD> forClear, forDraw;
 												 pl->Body().clear();
 												 std::vector<COORD> body;
 												 for (size_t i = 2; i < packet.size();)
@@ -217,30 +233,36 @@ void Engine::ReceiveData()
 													 i++;
 													 end.Y = packet[i];
 													 if (i < packet.size() - 1)
-														 i--;
+													 i--;
 													 else
 													 {
-														 i++;
+													 i++;
 													 }
 													 body = CalcBody(begin, end);
 													 if (pl->Body().size()>0)
 													 {
-														 if ((pl->Body().rbegin()->X == body.begin()->X) && (pl->Body().rbegin()->Y == body.begin()->Y))
-															 body.erase(body.begin());
+													 if ((pl->Body().rbegin()->X == body.begin()->X) && (pl->Body().rbegin()->Y == body.begin()->Y))
+													 body.erase(body.begin());
 													 }
 													 for (size_t j = 0; j < body.size(); j++)
 													 {
-														 pl->Body().push_back(body[j]);
+													 pl->Body().push_back(body[j]);
 													 }*/
 													 COORD p;
 													 p.X = packet[i];
 													 i++;
 													 p.Y = packet[i];
 													 i++;
+													 if (!VectorContains(oldBody, p))
+														 forDraw.push_back(p);
 													 pl->Body().push_back(p);
 												 }
-												 field.DrawPlayer(*pl);
+												 for (auto it=oldBody.begin();it!=oldBody.end();it++)
+												 if (!VectorContains(pl->Body(), *it))
+													 forClear.push_back(*it);
+												 field.UpdatePlayer(forClear, forDraw, pl->IsLocal());
 											 }
+
 			}
 				break;
 			case EPacketType::start_info:
@@ -261,16 +283,24 @@ void Engine::ReceiveData()
 				break;
 			case EPacketType::delete_player:
 			{
-											   Player* pl = GetPlayer(packet[1]);
-											   if (pl)
+											   if (localPlayer->Id() == packet[1])
 											   {
-												   field.ClearPlayer(pl->Body());
-												   for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
+												   PrintString("You lose! Press ESC to exit...");
+												   TerminateThread(serviceThread.native_handle(), 0);
+											   }
+											   else
+											   {
+												   Player* pl = GetPlayer(packet[1]);
+												   if (pl)
 												   {
-													   if (it->Id() == pl->Id())
+													   field.ClearPlayer(pl->Body());
+													   for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
 													   {
-														   remotePlayers.erase(it);
-														   break;
+														   if (it->Id() == pl->Id())
+														   {
+															   remotePlayers.erase(it);
+															   break;
+														   }
 													   }
 												   }
 											   }
