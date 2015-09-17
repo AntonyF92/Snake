@@ -11,6 +11,9 @@ void ServerApplication::Init()
 	timeForMove = 0;
 	currentTime = 0;
 	timeForGenerateBonus = 0;
+	maxScores = 0;
+	bonusLocked = false;
+	scoreChanged = false;
 	ep = ip::tcp::endpoint(ip::tcp::v4(), SERVER_PORT);
 	ip::tcp::acceptor acceptor(service, ep);
 	serviceThread = boost::thread(boost::bind(&ServerApplication::Work, this));
@@ -19,25 +22,36 @@ void ServerApplication::Init()
 	{
 		socket_ptr peer(new ip::tcp::socket(service));
 		acceptor.accept(*peer);
-		peer->set_option(ip::tcp::no_delay(true));
-		Client cl(addPlayerId++, peer);
-		CreateBody(cl);
-
-		plMutex.lock();
 		std::string packetForNewPlayer = "";
-		packetForNewPlayer += cl.SerializeFull(true);
-		for (auto it = players.begin(); it != players.end(); it++)
+		plMutex.lock();
+		if (players.size() == MAX_PLAYER_COUNT)
 		{
-			if (!it->disconnected)
-			{
-				packetForNewPlayer += it->SerializeFull();
-			}
+			packetForNewPlayer += ToString(EPacketType::start_info) + ",";
+			packetForNewPlayer += ToString(EStartError::max_players) + "," + END_OF_PACKET;
+			peer->send(buffer(packetForNewPlayer));
+			peer->close();
 		}
-		packetForNewPlayer += SerializeBonuses();
-		cl.Peer()->send(buffer(packetForNewPlayer));
-		SendToAll(cl.SerializeFull());
-		players.push_back(cl);
-		std::cout << "Add player: " << cl.Id() << std::endl;
+		else
+		{
+			peer->set_option(ip::tcp::no_delay(true));
+			Client cl(addPlayerId++, peer);
+			CreateBody(cl);
+
+			packetForNewPlayer += cl.SerializeFull(true);
+			for (auto it = players.begin(); it != players.end(); it++)
+			{
+				if (!it->disconnected)
+				{
+					packetForNewPlayer += it->SerializeFull();
+				}
+			}
+			packetForNewPlayer += SerializeBonuses();
+			packetForNewPlayer += SerializeScoresForPlayer(cl);
+			cl.Peer()->send(buffer(packetForNewPlayer));
+			SendToAll(cl.SerializeFull());
+			players.push_back(cl);
+			std::cout << "Add player: " << cl.Id() << std::endl;
+		}
 		plMutex.unlock();
 	}
 }
@@ -66,9 +80,12 @@ void ServerApplication::Work()
 		{
 			GenerateBonuses();
 			packet += SerializeBonuses();
+			bonusLocked = false;
 		}
 		if (packet.length() > 0)
 			SendToAll(packet);
+		if (scoreChanged)
+			SendScores();
 		plMutex.unlock();
 		currentTime += timer.elapsed() * 1000;
 		boost::this_thread::sleep_for(boost::chrono::milliseconds(FIXED_UPDATE_DELTA_TIME));
@@ -155,7 +172,15 @@ std::string ServerApplication::MovePlayer(Client& cl)
 		cl.AddBlock(newPos);
 		res = cl.Serialize();
 		RemoveBonus(newPos);
-		timeForGenerateBonus = currentTime + GENERATE_BONUS_DELTA_TIME;
+		cl.scores++;
+		maxScores = cl.scores > maxScores ? cl.scores : maxScores;
+		scoreChanged = true;
+		if (!bonusLocked)
+		{
+			timeForGenerateBonus = currentTime + GENERATE_BONUS_DELTA_TIME;
+			bonusLocked = true;
+		}
+		std::cout << "Player " << cl.Id() << " eat bonus" << std::endl;
 	}
 	else
 	{
@@ -168,7 +193,7 @@ std::string ServerApplication::MovePlayer(Client& cl)
 
 bool ServerApplication::CheckHeadPos(COORD& pos)
 {
-	return ((pos.X != 0) && (pos.X != GAME_FIELD_WIDTH) && (pos.Y != 0) && (pos.Y != GAME_FIELD_HEIGHT));
+	return ((pos.X != BORDER_X) && (pos.X != GAME_FIELD_WIDTH) && (pos.Y != BORDER_Y) && (pos.Y != GAME_FIELD_HEIGHT));
 }
 
 bool ServerApplication::CheckPosForBonus(COORD& pos)
@@ -192,8 +217,8 @@ void ServerApplication::GenerateBonuses()
 		COORD p;
 		do
 		{			
-			p.X = 1 + std::rand() % (GAME_FIELD_WIDTH - 1);
-			p.Y = 1 + std::rand() % (GAME_FIELD_HEIGHT - 1);
+			p.X = BORDER_X + 1 + std::rand() % (GAME_FIELD_WIDTH - 1 - BORDER_X);
+			p.Y = BORDER_Y + 1 + std::rand() % (GAME_FIELD_HEIGHT - 1 - BORDER_Y);
 		} while (VectorContains(allPlayers, p));
 		bonusList.push_back(p);
 	}
@@ -222,4 +247,24 @@ void ServerApplication::RemoveBonus(COORD& pos)
 			break;
 		}
 	}
+}
+
+void ServerApplication::SendScores()
+{
+	for (auto it = players.begin(); it != players.end(); it++)
+	{
+		auto packet = SerializeScoresForPlayer(*it);
+		it->Peer()->send(buffer(packet));
+	}
+	scoreChanged = false;
+}
+
+std::string ServerApplication::SerializeScoresForPlayer(Client& cl)
+{
+	std::string packet = "";
+	packet += ToString(EPacketType::scores) + ",";
+	packet += ToString(cl.scores) + ",";
+	packet += ToString(maxScores) + ",";
+	packet += END_OF_PACKET;
+	return packet;
 }

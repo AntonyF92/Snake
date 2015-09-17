@@ -9,6 +9,7 @@ Client::Client(int id, socket_ptr peer)
 	disconnected = false;
 	finished = false;
 	currentDirection = EDirection::up;
+	scores = 0;
 }
 
 std::string Client::ReadData()
@@ -107,11 +108,13 @@ std::string Client::SerializeFull(bool for_start)
 {
 	std::string packet = "";
 	if (for_start)
+	{
 		packet += ToString((int)EPacketType::start_info) + ",";
+		packet += ToString(EStartError::no) + ",";
+	}
 	else
 		packet += ToString((int)EPacketType::add_client) + ",";
 	packet += ToString(id) + ",";
-	packet += ToString((int)currentDirection) + ",";
 	for (size_t j=0;j<body.size();j++)
 	{
 		auto coord = body[j];

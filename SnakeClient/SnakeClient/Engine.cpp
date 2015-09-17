@@ -160,7 +160,7 @@ void Engine::ReceiveData()
 			case EPacketType::add_client:
 			{
 											std::vector<COORD> body;
-											for (size_t i = 3; i < packet.size();)
+											for (size_t i = 2; i < packet.size();)
 											{
 												COORD p;
 												p.X = packet[i];
@@ -176,8 +176,6 @@ void Engine::ReceiveData()
 				break;
 			case EPacketType::bonus_info:
 			{
-											for (auto it = bonusList.begin(); it != bonusList.end(); it++)
-												field.ClearInPosition(*it);
 											bonusList.clear();
 											for (size_t i = 1; i < packet.size();)
 											{
@@ -267,18 +265,25 @@ void Engine::ReceiveData()
 				break;
 			case EPacketType::start_info:
 			{
-											std::vector<COORD> body;
-											for (size_t i = 3; i < packet.size();)
+											if ((EStartError)packet[1] == EStartError::max_players)
 											{
-												COORD p;
-												p.X = packet[i];
-												i++;
-												p.Y = packet[i];
-												i++;
-												body.push_back(p);
+												PrintString("The server filled. Press ESC to exit...");
 											}
-											localPlayer = new LocalPlayer(packet[1], body);
-											localPlayer->SetDirection((EDirection)packet[2]);
+											else
+											{
+												std::vector<COORD> body;
+												for (size_t i = 3; i < packet.size();)
+												{
+													COORD p;
+													p.X = packet[i];
+													i++;
+													p.Y = packet[i];
+													i++;
+													body.push_back(p);
+												}
+												localPlayer = new LocalPlayer(packet[2], body);
+											}
+											
 			}
 				break;
 			case EPacketType::delete_player:
@@ -304,6 +309,11 @@ void Engine::ReceiveData()
 													   }
 												   }
 											   }
+			}
+				break;
+			case EPacketType::scores:
+			{
+										field.PrintScores(packet[1], packet[2]);
 			}
 				break;
 			}

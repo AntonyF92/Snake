@@ -16,33 +16,35 @@ void Field::Init()
 	info.bVisible = false;
 	SetConsoleCursorInfo(consoleHandle, &info);
 	SetConsoleCharColor(LIGHTBLUE);
+	SetCursorPosition(BORDER_X, BORDER_Y);
 	unsigned char a = 201;
 	std::cout << a;
-	SetCursorPosition(0, GAME_FIELD_HEIGHT);
+	SetCursorPosition(BORDER_X, GAME_FIELD_HEIGHT);
 	a = 200;
 	std::cout << a;
 	SetCursorPosition(GAME_FIELD_WIDTH, GAME_FIELD_HEIGHT);
 	a = 188;
 	std::cout << a;
-	SetCursorPosition(GAME_FIELD_WIDTH, 0);
+	SetCursorPosition(GAME_FIELD_WIDTH, BORDER_Y);
 	a = 187;
 	std::cout << a;
 	a = 205;
-	for (int i = 1; i < GAME_FIELD_WIDTH; i++)
+	for (int i = BORDER_X + 1; i < GAME_FIELD_WIDTH; i++)
 	{
-		SetCursorPosition(i, 0);
+		SetCursorPosition(i, BORDER_Y);
 		std::cout << a;
 		SetCursorPosition(i, GAME_FIELD_HEIGHT);
 		std::cout << a;
 	}
 	a = 186;
-	for (int i = 1; i < GAME_FIELD_HEIGHT; i++)
+	for (int i = BORDER_Y + 1; i < GAME_FIELD_HEIGHT; i++)
 	{
-		SetCursorPosition(0, i);
+		SetCursorPosition(BORDER_X, i);
 		std::cout << a;
 		SetCursorPosition(GAME_FIELD_WIDTH, i);
 		std::cout << a;
 	}
+	PrintScores(0, 0);
 }
 
 void Field::SetCursorPosition(int x, int y)
@@ -122,4 +124,13 @@ void Field::PrintText(const std::string s)
 	std::cout << "                                                               " << std::endl;
 	SetCursorPosition(0, GAME_FIELD_HEIGHT + 1);
 	std::cout << s << std::endl;
+}
+
+void Field::PrintScores(int current, int max)
+{
+	SetConsoleCharColor(WHITE);
+	SetCursorPosition(0, 0);
+	std::cout << "                               ";
+	SetCursorPosition(0, 0);
+	std::cout << "Scores: " << current << " Max scores: " << max;
 }

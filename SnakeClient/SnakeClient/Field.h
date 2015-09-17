@@ -18,4 +18,5 @@ public:
 	void UpdatePlayer(const std::vector<COORD>& forClear, const std::vector<COORD>& forDraw, const bool is_local);
 	void ClearInPosition(COORD);
 	void ClearPlayer(std::vector<COORD>& body);
+	void PrintScores(int current, int max);
 };

@@ -18,6 +18,9 @@ private:
 	boost::mutex plMutex;
 	double currentTime, timeForMove, timeForGenerateBonus;
 	std::vector<COORD> bonusList;
+	bool bonusLocked;
+	int maxScores;
+	bool scoreChanged;
 
 	void CreateBody(Client&);
 	void SendToAll(std::string packet);
@@ -31,6 +34,8 @@ private:
 	void GenerateBonuses();
 	std::string SerializeBonuses();
 	void RemoveBonus(COORD&);
+	void SendScores();
+	std::string SerializeScoresForPlayer(Client&);
 public:
 	std::string packetForSend;
 	void Init();

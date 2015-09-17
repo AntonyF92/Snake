@@ -1,5 +1,5 @@
 #pragma once
-#include "GeneralDefinitions.h";
+#include "GeneralDefinitions.h"
 #include "MemoryBuffer.h"
 
 class Player

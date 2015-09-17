@@ -20,6 +20,8 @@ const int SNAKE_MOVEMENT_DELTA_TIME = 350;
 const int SNAKE_INIT_LENGTH = 6;
 const int MAX_BONUS_COUNT = 5;
 const int GENERATE_BONUS_DELTA_TIME = 5000;
+const int BORDER_X = 0;
+const int BORDER_Y = 1;
 
 typedef boost::shared_ptr<ip::tcp::socket> socket_ptr;
 typedef char* bytes;
@@ -31,7 +33,14 @@ enum EPacketType
 	bonus_info = 3,
 	client_eat_bonus = 4,
 	add_client = 5,
-	delete_player = 6
+	delete_player = 6,
+	scores = 7
+};
+
+enum EStartError
+{
+	no = 1,
+	max_players = 2
 };
 
 enum EDirection

@@ -13,6 +13,7 @@ public:
 	bool disconnected;
 	bool finished;
 	bool directionChanged;
+	int scores;
 	Client(int, socket_ptr);
 	std::string ReadData();
 	std::vector<COORD>& Body();
