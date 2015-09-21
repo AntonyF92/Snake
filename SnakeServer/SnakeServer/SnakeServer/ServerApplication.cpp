@@ -17,18 +17,21 @@ void ServerApplication::Init()
 	ep = ip::tcp::endpoint(ip::tcp::v4(), SERVER_PORT);
 	ip::tcp::acceptor acceptor(service, ep);
 	serviceThread = boost::thread(boost::bind(&ServerApplication::Work, this));
-	MemoryBuffer::Init();
+	MemoryBuffer::Init(100);
 	while (true)
 	{
 		socket_ptr peer(new ip::tcp::socket(service));
 		acceptor.accept(*peer);
-		std::string packetForNewPlayer = "";
+		std::vector<int> data;
+		int* packetForNewPlayer = nullptr;
 		plMutex.lock();
 		if (players.size() == MAX_PLAYER_COUNT)
 		{
-			packetForNewPlayer += ToString(EPacketType::start_info) + ",";
-			packetForNewPlayer += ToString(EStartError::max_players) + "," + END_OF_PACKET;
-			peer->send(buffer(packetForNewPlayer));
+			packetForNewPlayer = (int*)MemoryBuffer::Instance()->GetBuffer(12);
+			packetForNewPlayer[0] = EPacketType::start_info;
+			packetForNewPlayer[1] = 1;
+			packetForNewPlayer[2] = EStartError::max_players;
+			peer->send(buffer(packetForNewPlayer, 12));
 			peer->close();
 		}
 		else
@@ -36,18 +39,21 @@ void ServerApplication::Init()
 			peer->set_option(ip::tcp::no_delay(true));
 			Client cl(addPlayerId++, peer);
 			CreateBody(cl);
-
-			packetForNewPlayer += cl.SerializeFull(true);
+			std::vector<int> data;
+			VectorAddRange(cl.SerializeFull(true), data);
 			for (auto it = players.begin(); it != players.end(); it++)
 			{
 				if (!it->disconnected)
 				{
-					packetForNewPlayer += it->SerializeFull();
+					VectorAddRange(it->SerializeFull(), data);
 				}
 			}
-			packetForNewPlayer += SerializeBonuses();
-			packetForNewPlayer += SerializeScoresForPlayer(cl);
-			cl.Peer()->send(buffer(packetForNewPlayer));
+			VectorAddRange(SerializeBonuses(), data);
+			VectorAddRange(SerializeScoresForPlayer(cl), data);
+			packetForNewPlayer = (int*)MemoryBuffer::Instance()->GetBuffer(data.size() * 4);
+			for (size_t i = 0; i < data.size(); i++)
+				packetForNewPlayer[i] = data[i];
+			cl.Peer()->send(buffer(packetForNewPlayer, data.size() * 4));
 			SendToAll(cl.SerializeFull());
 			players.push_back(cl);
 			std::cout << "Add player: " << cl.Id() << std::endl;
@@ -62,8 +68,8 @@ void ServerApplication::Work()
 	{
 		boost::timer timer;
 		plMutex.lock();
-		std::string packet = "";
-		packet += CheckDisconnects();
+		std::vector<int> packet;
+		VectorAddRange(CheckDisconnects(), packet);
 		for (auto it = players.begin(); it != players.end(); it++)
 		{
 			it->ReadData();
@@ -72,17 +78,17 @@ void ServerApplication::Work()
 		{
 			for (auto it = players.begin(); it != players.end(); it++)
 			{
-				packet += MovePlayer(*it);				
+				VectorAddRange(MovePlayer(*it), packet);
 			}
 			timeForMove += SNAKE_MOVEMENT_DELTA_TIME;
 		}
 		if (currentTime >= timeForGenerateBonus&&bonusList.size()<MAX_BONUS_COUNT)
 		{
 			GenerateBonuses();
-			packet += SerializeBonuses();
+			VectorAddRange(SerializeBonuses(), packet);
 			bonusLocked = false;
 		}
-		if (packet.length() > 0)
+		if (packet.size())
 			SendToAll(packet);
 		if (scoreChanged)
 			SendScores();
@@ -94,9 +100,12 @@ void ServerApplication::Work()
 
 }
 
-void ServerApplication::SendToAll(std::string packet)
+void ServerApplication::SendToAll(std::vector<int> packet)
 {
-	auto buff = buffer(packet);
+	int* data = (int*)MemoryBuffer::Instance()->GetBuffer(packet.size() * 4);
+	for (int i = 0; i < packet.size(); i++)
+		data[i] = packet[i];
+	auto buff = buffer(data, packet.size() * 4);
 	for (auto it = players.begin(); it != players.end(); it++)
 	{
 		try
@@ -109,12 +118,12 @@ void ServerApplication::SendToAll(std::string packet)
 			it->disconnected = true;
 		}
 	}
-	packet = "";
 }
 
-void ServerApplication::CreateBody(Client& cl)
+bool ServerApplication::CreateBody(Client& cl)
 {
-	for (int i = 0; i < SNAKE_INIT_LENGTH; i++)
+	
+	for (int i = 1; i < SNAKE_INIT_LENGTH; i++)
 	{
 		COORD p;
 		p.X = 20;
@@ -133,15 +142,15 @@ void ServerApplication::CopyPacket(NetPacket& in, NetPacket& out)
 		out.data[i] = in.data[i];
 }
 
-std::string ServerApplication::CheckDisconnects()
+std::vector<int> ServerApplication::CheckDisconnects()
 {
-	std::string packet = "";
+	std::vector<int> packet;
 	for (auto it = players.begin(); it != players.end();)
 	{
 		if (it->disconnected || it->finished)
 		{
 			if (it->disconnected)
-				packet += it->SerializeDelete();
+				VectorAddRange(it->SerializeDelete(), packet);
 			std::cout << "Remove player " << it->Id() << std::endl;
 			it = players.erase(it);
 		}
@@ -151,9 +160,9 @@ std::string ServerApplication::CheckDisconnects()
 	return packet;
 }
 
-std::string ServerApplication::MovePlayer(Client& cl)
+std::vector<int> ServerApplication::MovePlayer(Client& cl)
 {
-	std::string res = "";
+	std::vector<int> res;
 	COORD newPos = cl.HeadPosition();
 	switch (cl.CurrentDirection())
 	{
@@ -224,16 +233,16 @@ void ServerApplication::GenerateBonuses()
 	}
 }
 
-std::string ServerApplication::SerializeBonuses()
+std::vector<int> ServerApplication::SerializeBonuses()
 {
-	std::string res = "";
-	res += ToString(EPacketType::bonus_info) + ",";
+	std::vector<int> res;
+	res.push_back(EPacketType::bonus_info);
+	res.push_back(bonusList.size() * 2);
 	for (auto it = bonusList.begin(); it != bonusList.end(); it++)
 	{
-		res += ToString(it->X) + ",";
-		res += ToString(it->Y) + ",";
+		res.push_back(it->X);
+		res.push_back(it->Y);
 	}
-	res += END_OF_PACKET;
 	return res;
 }
 
@@ -259,12 +268,12 @@ void ServerApplication::SendScores()
 	scoreChanged = false;
 }
 
-std::string ServerApplication::SerializeScoresForPlayer(Client& cl)
+std::vector<int> ServerApplication::SerializeScoresForPlayer(Client& cl)
 {
-	std::string packet = "";
-	packet += ToString(EPacketType::scores) + ",";
-	packet += ToString(cl.scores) + ",";
-	packet += ToString(maxScores) + ",";
-	packet += END_OF_PACKET;
+	std::vector<int> packet;
+	packet.push_back(EPacketType::scores);
+	packet.push_back(2);
+	packet.push_back(cl.scores);
+	packet.push_back(maxScores);
 	return packet;
 }

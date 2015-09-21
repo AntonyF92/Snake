@@ -25,7 +25,7 @@ private:
 	bool canChangeDirection;
 	boost::mutex lpMutex;
 	std::vector<COORD> bonusList;
-	std::string packetForSend;
+	std::vector<int> packetForSend;
 	
 	void FixedUpdate();
 	Player* GetPlayer(int);

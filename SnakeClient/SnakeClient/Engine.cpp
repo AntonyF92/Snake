@@ -6,8 +6,8 @@ Engine::Engine()
 	currentTime = 0;
 	timeForMove = 0;
 	peer = socket_ptr(new ip::tcp::socket(service));
-	MemoryBuffer::Init();
-	packetForSend = "";
+	MemoryBuffer::Init(20000);
+	
 }
 
 void Engine::Init()
@@ -79,7 +79,7 @@ EGameState Engine::GameState() const
 
 void Engine::MovePlayer()
 {
-	COORD newPos = localPlayer->HeadPosition();
+	/*COORD newPos = localPlayer->HeadPosition();
 	switch (localPlayer->CurrentDirection())
 	{
 	case EDirection::up: newPos.Y--; break;
@@ -99,16 +99,16 @@ void Engine::MovePlayer()
 		localPlayer->Move();
 		packetForSend = localPlayer->Serialize();
 	}
-	
+	*/
 	
 }
 
 void Engine::SetLocalDirection(EDirection direction)
 {
 	boost::lock_guard<boost::mutex> lock(lpMutex);
-	packetForSend += ToString((int)EPacketType::client_info) + ",";
-	packetForSend += ToString((int)direction) + ",";
-	packetForSend += END_OF_PACKET;
+	packetForSend.push_back(EPacketType::client_info);
+	packetForSend.push_back(1);
+	packetForSend.push_back(direction);
 	SendData();
 }
 
@@ -135,190 +135,194 @@ void Engine::SendData()
 {
 	try
 	{
-		peer->send(buffer(packetForSend));
+		int* data = (int*)MemoryBuffer::Instance()->GetBuffer(packetForSend.size() * 4);
+		for (size_t i = 0; i < packetForSend.size(); i++)
+			data[i] = packetForSend[i];
+		peer->send(buffer(data, packetForSend.size() * 4));
 	}
 	catch (boost::system::system_error& err){}
-	packetForSend = "";
+	packetForSend.clear();
 }
 
 void Engine::ReceiveData()
 {
-	char* v;
+	unsigned char* v;
 	size_t a = peer->available();
-	v = new char[a];
+	v = new unsigned char[a];
 	std::memset(v, 0, a);
 	peer->receive(buffer(v, a));
-	std::string data(v);
-	FormattPacket(data);
-	while (data.length()>0)
+	int* data = (int*)v;
+	for (int i = 0; i < a / 4;)
 	{
-		std::vector<int> packet = SplitStringToInt(data.substr(0, data.find('|')), ',');
-		if (packet.size())
+		int packet = data[i];
+		i++;
+		int length = data[i];
+		length += ++i;
+		switch ((EPacketType)packet)
 		{
-			switch ((EPacketType)packet[0])
-			{
-			case EPacketType::add_client:
-			{
+		case EPacketType::add_client:
+		{
+										int id = data[i];
+										i++;
+										std::vector<COORD> body;
+										while (i < length)
+										{
+											COORD p;
+											p.X = data[i];
+											i++;
+											p.Y = data[i];
+											i++;
+											body.push_back(p);
+										}
+										Player pl(id, body);
+										remotePlayers.push_back(pl);
+										field.DrawPlayer(pl);
+		}
+			break;
+		case EPacketType::bonus_info:
+		{
+										bonusList.clear();
+										while (i < length)
+										{
+											COORD p;
+											p.X = data[i];
+											i++;
+											p.Y = data[i];
+											i++;
+											bonusList.push_back(p);
+											field.DrawBonus(p);
+										}
+		}
+			break;
+		case EPacketType::client_info:
+		{
+										 int id = data[i];
+										 i++;
+										 Player* pl = nullptr;
+										 if (localPlayer->Id() == id)
+										 {
+											 pl = localPlayer;
+										 }
+										 else
+										 {
+											 pl = GetPlayer(id);
+										 }
+										 if (pl)
+										 {
+											 std::vector<COORD> oldBody = pl->Body();
+											 std::vector<COORD> forClear, forDraw;
+											 pl->Body().clear();
+											 std::vector<COORD> body;
+											 while (i < length)
+											 {
+												 /*COORD begin;
+												 begin.X = data[i];
+												 i++;
+												 begin.Y = data[i];
+												 i++;
+												 COORD end;
+												 end.X = data[i];
+												 i++;
+												 end.Y = data[i];
+												 if (i < length - 1)
+													 i--;
+												 else
+												 {
+													 i++;
+												 }
+												 body = CalcBody(begin, end);
+												 if (pl->Body().size()>0)
+												 {
+													 if ((pl->Body().rbegin()->X == body.begin()->X) && (pl->Body().rbegin()->Y == body.begin()->Y))
+														 body.erase(body.begin());
+												 }
+												 for (size_t j = 0; j < body.size(); j++)
+												 {
+													 if (!VectorContains(oldBody, body[j]))
+														 forDraw.push_back(body[j]);
+													 pl->Body().push_back(body[j]);
+												 }*/
+												 COORD p;
+												 p.X = data[i];
+												 i++;
+												 p.Y = data[i];
+												 i++;
+												 if (!VectorContains(oldBody, p))
+													 forDraw.push_back(p);
+												 pl->Body().push_back(p);
+											 }
+											 for (auto it = oldBody.begin(); it != oldBody.end(); it++)
+											 if (!VectorContains(pl->Body(), *it))
+												 forClear.push_back(*it);
+											 field.UpdatePlayer(forClear, forDraw, pl->IsLocal());
+										 }
+
+		}
+			break;
+		case EPacketType::start_info:
+		{
+										int error = data[i];
+										i++;
+										if ((EStartError)error== EStartError::max_players)
+										{
+											PrintString("The server filled. Press ESC to exit...");
+										}
+										else
+										{
+											int id = data[i];
+											i++;
 											std::vector<COORD> body;
-											for (size_t i = 2; i < packet.size();)
+											while(i<length)
 											{
 												COORD p;
-												p.X = packet[i];
+												p.X = data[i];
 												i++;
-												p.Y = packet[i];
+												p.Y = data[i];
 												i++;
 												body.push_back(p);
 											}
-											Player pl(packet[1], body);
-											remotePlayers.push_back(pl);
-											field.DrawPlayer(pl);
-			}
-				break;
-			case EPacketType::bonus_info:
-			{
-											bonusList.clear();
-											for (size_t i = 1; i < packet.size();)
-											{
-												COORD p;
-												p.X = packet[i];
-												i++;
-												p.Y = packet[i];
-												i++;
-												bonusList.push_back(p);
-												field.DrawBonus(p);
-											}
-			}
-				break;
-			case EPacketType::client_eat_bonus:
-			{
-												  COORD p;
-												  p.X = packet[2];
-												  p.Y = packet[3];
-												  Player* pl = GetPlayer(packet[1]);
-												  if (pl)
-												  {
-													  pl->AddBlock(p);
-													  pl->drawRemoveTail = false;
-												  }
-			}
-				break;
-			case EPacketType::client_info:
-			{
-											 Player* pl = nullptr;
-											 if (localPlayer->Id() == packet[1])
-											 {
-												 pl = localPlayer;
-											 }
-											 else
-											 {
-												 pl = GetPlayer(packet[1]);
-											 }
-											 if (pl)
-											 {
-												 std::vector<COORD> oldBody = pl->Body();
-												 std::vector<COORD> forClear, forDraw;
-												 pl->Body().clear();
-												 std::vector<COORD> body;
-												 for (size_t i = 2; i < packet.size();)
-												 {
-													 /*COORD begin;
-													 begin.X = packet[i];
-													 i++;
-													 begin.Y = packet[i];
-													 i++;
-													 COORD end;
-													 end.X = packet[i];
-													 i++;
-													 end.Y = packet[i];
-													 if (i < packet.size() - 1)
-													 i--;
-													 else
-													 {
-													 i++;
-													 }
-													 body = CalcBody(begin, end);
-													 if (pl->Body().size()>0)
-													 {
-													 if ((pl->Body().rbegin()->X == body.begin()->X) && (pl->Body().rbegin()->Y == body.begin()->Y))
-													 body.erase(body.begin());
-													 }
-													 for (size_t j = 0; j < body.size(); j++)
-													 {
-													 pl->Body().push_back(body[j]);
-													 }*/
-													 COORD p;
-													 p.X = packet[i];
-													 i++;
-													 p.Y = packet[i];
-													 i++;
-													 if (!VectorContains(oldBody, p))
-														 forDraw.push_back(p);
-													 pl->Body().push_back(p);
-												 }
-												 for (auto it=oldBody.begin();it!=oldBody.end();it++)
-												 if (!VectorContains(pl->Body(), *it))
-													 forClear.push_back(*it);
-												 field.UpdatePlayer(forClear, forDraw, pl->IsLocal());
-											 }
+											localPlayer = new LocalPlayer(id, body);
+										}
 
-			}
-				break;
-			case EPacketType::start_info:
-			{
-											if ((EStartError)packet[1] == EStartError::max_players)
-											{
-												PrintString("The server filled. Press ESC to exit...");
-											}
-											else
-											{
-												std::vector<COORD> body;
-												for (size_t i = 3; i < packet.size();)
-												{
-													COORD p;
-													p.X = packet[i];
-													i++;
-													p.Y = packet[i];
-													i++;
-													body.push_back(p);
-												}
-												localPlayer = new LocalPlayer(packet[2], body);
-											}
-											
-			}
-				break;
-			case EPacketType::delete_player:
-			{
-											   if (localPlayer->Id() == packet[1])
+		}
+			break;
+		case EPacketType::delete_player:
+		{
+										   int id = data[i];
+										   i++;
+										   if (localPlayer->Id() == id)
+										   {
+											   PrintString("You lose! Press ESC to exit...");
+											   TerminateThread(serviceThread.native_handle(), 0);
+										   }
+										   else
+										   {
+											   Player* pl = GetPlayer(id);
+											   if (pl)
 											   {
-												   PrintString("You lose! Press ESC to exit...");
-												   TerminateThread(serviceThread.native_handle(), 0);
-											   }
-											   else
-											   {
-												   Player* pl = GetPlayer(packet[1]);
-												   if (pl)
+												   field.ClearPlayer(pl->Body());
+												   for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
 												   {
-													   field.ClearPlayer(pl->Body());
-													   for (auto it = remotePlayers.begin(); it != remotePlayers.end(); it++)
+													   if (it->Id() == pl->Id())
 													   {
-														   if (it->Id() == pl->Id())
-														   {
-															   remotePlayers.erase(it);
-															   break;
-														   }
+														   remotePlayers.erase(it);
+														   break;
 													   }
 												   }
 											   }
-			}
-				break;
-			case EPacketType::scores:
-			{
-										field.PrintScores(packet[1], packet[2]);
-			}
-				break;
-			}
+										   }
 		}
-		data = data.erase(0, data.find('|') + 1);
+			break;
+		case EPacketType::scores:
+		{
+									int current = data[i];
+									i++;
+									int max = data[i];
+									i++;
+									field.PrintScores(current, max);
+		}
+			break;
+		}
 	}
 	delete v;
 }
@@ -340,9 +344,9 @@ void Engine::PrintString(const char* str)
 
 void Engine::Close()
 {
-	packetForSend += ToString((int)EPacketType::delete_player) + ",";
-	packetForSend += ToString(localPlayer->Id()) + ",";
-	packetForSend += END_OF_PACKET;
+	packetForSend.push_back(EPacketType::delete_player);
+	packetForSend.push_back(1);
+	packetForSend.push_back(localPlayer->Id());
 	SendData();
 	peer->close();
 }

@@ -22,20 +22,20 @@ private:
 	int maxScores;
 	bool scoreChanged;
 
-	void CreateBody(Client&);
-	void SendToAll(std::string packet);
+	bool CreateBody(Client&);
+	void SendToAll(std::vector<int>);
 	void Work();
 	void CopyPacket(NetPacket& in, NetPacket& out);
-	std::string CheckDisconnects();
-	std::string MovePlayer(Client&);
+	std::vector<int> CheckDisconnects();
+	std::vector<int> MovePlayer(Client&);
 	bool CheckPosForBonus(COORD&);
 	//std::string EatBonusSerialize(COORD&);
 	bool CheckHeadPos(COORD&);
 	void GenerateBonuses();
-	std::string SerializeBonuses();
+	std::vector<int> SerializeBonuses();
 	void RemoveBonus(COORD&);
 	void SendScores();
-	std::string SerializeScoresForPlayer(Client&);
+	std::vector<int> SerializeScoresForPlayer(Client&);
 public:
 	std::string packetForSend;
 	void Init();

@@ -15,13 +15,13 @@ public:
 	bool directionChanged;
 	int scores;
 	Client(int, socket_ptr);
-	std::string ReadData();
+	void ReadData();
 	std::vector<COORD>& Body();
 	int Id();
 	EDirection CurrentDirection();
-	std::string Serialize();
-	std::string SerializeFull(bool for_start = false);
-	std::string SerializeDelete();
+	std::vector<int> Serialize();
+	std::vector<int> SerializeFull(bool for_start = false);
+	std::vector<int> SerializeDelete();
 	socket_ptr Peer();
 	void SetDirection(EDirection);
 	void Move();
